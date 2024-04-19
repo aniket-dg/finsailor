@@ -1,0 +1,28 @@
+version: "3"
+services:
+  db:
+    image: postgres:15.2-alpine
+    ports:
+      - "5436:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_DB: investment_db
+
+  api:
+    build: .
+    # command: python3.11 ./manage.py runserver_plus --print-sql 0.0.0.0:8000
+    command: python3.11 ./manage.py runserver 0.0.0.0:8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/code
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+volumes:
+  db_data:
