@@ -38,6 +38,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "drf_yasg",
+    "dashboard",
+    "datahub",
+    "data_import",
+    "users",
+    "industries",
 ]
 
 MIDDLEWARE = [
@@ -76,12 +82,12 @@ WSGI_APPLICATION = "combo_investment.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": os.getenv("DATABASE_ENGINE"),
-        "NAME": os.environ.get("DATABASE_NAME"),
-        "USER": os.environ.get("DATABASE_USER"),
-        "PASSWORD": os.environ.get("DATABASE_PASSWORD"),
-        "HOST": os.getenv("DATABASE_HOST"),
-        "PORT": os.getenv("DATABASE_PORT"),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "investment_db",
+        "USER": "admin",
+        "PASSWORD": "admin",
+        "HOST": "localhost",
+        "PORT": 5436,
     }
 }
 
@@ -120,9 +126,33 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = "static/"
-
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+AUTH_USER_MODEL = "users.User"
+
+
+# AWS_ACCESS_KEY_ID = "your-access-key-id"
+# AWS_SECRET_ACCESS_KEY = "your-secret-access-key"
+# AWS_STORAGE_BUCKET_NAME = "your-bucket-name"
+# AWS_S3_REGION_NAME = "your-region-name"  # e.g., 'us-west-1'
+#
+# DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+REST_FRAMEWORK = {"DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema"}
+
+
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {"Basic": {"type": "basic"}},
+    "REFETCH_SCHEMA_WITH_AUTH": True,
+    "DEFAULT_AUTO_SCHEMA_CLASS": "combo_investment.swagger.CustomAutoSchema",
+}
