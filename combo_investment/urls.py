@@ -1,4 +1,9 @@
 from django.contrib import admin
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularSwaggerView,
+    SpectacularRedocView,
+)
 from rest_framework import permissions
 from django.urls import path, include
 from drf_yasg.views import get_schema_view
@@ -15,15 +20,19 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
-        "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
+        "swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
     ),
     path(
-        "swagger/",
-        schema_view.with_ui("swagger", cache_timeout=0),
-        name="schema-swagger-ui",
+        "redoc/",
+        SpectacularRedocView.as_view(url_name="schema"),
+        name="redoc",
     ),
-    path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
-    path("api/", include("dashboard.urls")),
+    path("api/dashboard/", include("dashboard.urls")),
+    path("api/datahub/", include("datahub.urls")),
+    path("api/user_investments/", include("user_investment.urls")),
 ]

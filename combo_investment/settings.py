@@ -39,11 +39,14 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "drf_yasg",
+    "drf_spectacular",
+    "django_filters",
     "dashboard",
     "datahub",
     "data_import",
     "users",
     "industries",
+    "user_investment",
 ]
 
 MIDDLEWARE = [
@@ -148,11 +151,30 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static")
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-REST_FRAMEWORK = {"DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema"}
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "COMPONENT_SPLIT_REQUEST": True,
+}
 
 
 SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {"Basic": {"type": "basic"}},
     "REFETCH_SCHEMA_WITH_AUTH": True,
-    "DEFAULT_AUTO_SCHEMA_CLASS": "combo_investment.swagger.CustomAutoSchema",
+    "COMPONENT_SPLIT_REQUEST": True,
+    # "DEFAULT_AUTO_SCHEMA_CLASS": "combo_investment.swagger.CustomAutoSchema",
+}
+
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Combo Investment API",
+    "DESCRIPTION": "",
+    "VERSION": "0.1.0",
+    "SERVE_PERMISSIONS": [
+        (
+            "rest_framework.permissions.AllowAny"
+            if DEBUG
+            else "rest_framework.permissions.IsAuthenticated"
+        )
+    ],
+    "COMPONENT_SPLIT_REQUEST": True,
 }

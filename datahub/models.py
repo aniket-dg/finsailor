@@ -17,6 +17,11 @@ class CustomJSONEncoder(JSONEncoder):
             return float(obj)
 
 
+class SecurityCache(models.Model):
+    name = models.CharField(max_length=100)
+    symbol = models.CharField(max_length=100)
+
+
 class Security(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
     isin = models.CharField(max_length=100, null=True, blank=True)

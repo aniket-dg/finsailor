@@ -1,8 +1,9 @@
 import difflib
+from collections import defaultdict
 
 import requests
-from django.shortcuts import render
-from bsedata.bse import BSE
+
+from datahub.models import SecurityCache
 
 
 def find_max_matching_string(target, string_list):
@@ -19,6 +20,24 @@ def find_max_matching_string(target, string_list):
             max_matching_string = string
 
     return max_matching_string
+
+
+class NSECache:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def get_symbol(cls, scrip_name):
+        security_cache = SecurityCache.objects.filter(name=scrip_name).last()
+        if security_cache:
+            return security_cache.symbol
+        return None
+
+    @classmethod
+    def set_symbol(cls, scrip_name, symbol):
+        security_cache = SecurityCache(name=scrip_name, symbol=symbol)
+        security_cache.save()
+        return
 
 
 class NSEScrapper:
@@ -73,7 +92,7 @@ class NSEScrapper:
             "Chrome/123.0.0.0 Safari/537.36",
             "x-requested-with": "XMLHttpRequest",
         }
-
+        self.cache = NSECache
         if headers:
             self.headers = headers
 
@@ -85,6 +104,10 @@ class NSEScrapper:
         return response.text, response.status_code
 
     def get_symbol(self, scrip_name):
+        symbol = self.cache.get_symbol(scrip_name=scrip_name)
+        if symbol:
+            return symbol
+
         url = f"https://www.nseindia.com/api/search/autocomplete?q={scrip_name}"
         print(f"Fetching symbol for security - {scrip_name}")
         response, status_code = self.load_url(url)
@@ -93,20 +116,33 @@ class NSEScrapper:
 
         symbols = response.get("symbols")
 
-        symbol_name_to_symbol_data = {}
+        symbol_name_to_symbol_data = defaultdict(list)
         for symbol in symbols:
             if (
                 symbol["result_type"] == "symbol"
                 and symbol["result_sub_type"] == "equity"
             ):
-                symbol_name_to_symbol_data[symbol["symbol_info"].lower()] = symbol
+                symbol_name_to_symbol_data[symbol["symbol_info"].lower()].append(symbol)
 
         max_match_symbol_info = find_max_matching_string(
             scrip_name.lower(), symbol_name_to_symbol_data.keys()
         )
+
         symbol = symbol_name_to_symbol_data.get(max_match_symbol_info)
 
-        return symbol["symbol"] if symbol else None
+        if len(symbol) > 1:
+            all_matching_symbols = [sym["symbol"] for sym in symbol]
+            max_matching_symbol = find_max_matching_string(
+                scrip_name, all_matching_symbols
+            )
+            symbol = max_matching_symbol
+        else:
+            symbol = symbol[0]["symbol"]
+
+        if symbol:
+            self.cache.set_symbol(scrip_name=scrip_name, symbol=symbol)
+
+        return symbol if symbol else None
 
     def get_quote_by_symbol(self, symbol):
         url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol}"

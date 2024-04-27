@@ -17,7 +17,7 @@ class Sector(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.macro_sector.name} - {self.name}"
 
 
 class Industry(models.Model):
@@ -26,7 +26,7 @@ class Industry(models.Model):
     name = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.sector} - {self.name}"
 
 
 class BasicIndustry(models.Model):
@@ -40,4 +40,4 @@ class BasicIndustry(models.Model):
     details = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.name}"
+        return f"{self.industry} - {self.name}"

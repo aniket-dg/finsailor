@@ -1,6 +1,9 @@
 from django.shortcuts import render
+from rest_framework import serializers
+from drf_spectacular.utils import extend_schema
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -21,11 +24,13 @@ from data_import.utils import (
 from data_import.views import Groww, Zerodha
 
 
+@extend_schema(tags=["Dashboard App"])
 class ImportContractNoteData(APIView):
     parser_classes = (MultiPartParser, FormParser)
+    # serializer_class = UploadedContractNoteSerializer
 
-    @swagger_auto_schema(
-        request_body=UploadedContractNoteSerializer,
+    @extend_schema(
+        request=UploadedContractNoteSerializer,
         responses={201: TradeBookSerializer(many=True)},
     )
     def post(self, *args, **kwargs):
@@ -34,9 +39,9 @@ class ImportContractNoteData(APIView):
             return Response(serializer.errors)
 
         contract_note = serializer.save()
-        broker = Zerodha(dry_run=True)
+        broker = Zerodha()
         if contract_note.broker == "groww":
-            broker = Groww(contract_note.password, dry_run=True)
+            broker = Groww(contract_note.password)
 
         trade_books, imported = broker.import_data_from_contract_note(
             path=contract_note.pdf_file.path, date=contract_note.date.isoformat()
@@ -50,11 +55,12 @@ class ImportContractNoteData(APIView):
         )
 
 
+@extend_schema(tags=["Dashboard App"])
 class ImportDematReportData(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
-    @swagger_auto_schema(
-        request_body=UploadedDematReportSerializer,
+    @extend_schema(
+        request=UploadedDematReportSerializer,
         responses={201: InvestmentBookSerializer(many=True)},
     )
     def post(self, *args, **kwargs):

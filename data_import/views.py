@@ -97,13 +97,21 @@ class Groww:
         for trade_df in trades_dfs:
             if "Unnamed: 0" in trade_df.columns:
                 trade_df.rename(columns=unnamed_columns_mapping, inplace=True)
-            else:
+            elif "Order\rno." in trade_df.columns or "Quantity" in trade_df.columns:
                 trade_df.rename(columns=named_columns_mapping, inplace=True)
+            else:
+                print("Skipping df as it doesn't contain Trades")
+                continue
 
             for i, trade in trade_df.iterrows():
                 order_no = trade["Order No."]
+                security = trade["Security"]
                 if pd.isna(order_no) or order_no.strip() == "Total":
                     print("Skipping row as it is Total or Nan.")
+                    continue
+
+                if pd.isna(security):
+                    print("Skipping row as it contains Nan.")
                     continue
                 try:
                     order_no = int(order_no)
@@ -136,7 +144,7 @@ class Groww:
 
         if not self.dry_run:
             trade_books = TradeBook.objects.bulk_create(trade_book_objs)
-            print(f"Total trades imported - {trade_books.count()}")
+            print(f"Total trades imported - {len(trade_books)}")
 
         else:
             trade_books = trade_book_data
@@ -194,7 +202,7 @@ class Zerodha:
 
         if not self.dry_run:
             trade_books = TradeBook.objects.bulk_create(trade_books_to_crate)
-            print(f"Total trades imported - {trade_books.count()}")
+            print(f"Total trades imported - {len(trade_books)}")
         else:
             trade_books = trade_books_to_crate
             print(f"Total trades imported - {len(trade_books_to_crate)}")

@@ -13,14 +13,16 @@ def process_trade_books(headers=None):
         symbol = nse.get_symbol(trade_book.security)
         if not symbol:
             continue
-        security, created = Security.objects.get_or_create(symbol=symbol)
-        update_security(headers, security.id, nse)
+        security = Security.objects.filter(symbol=symbol).last()
+        if security is None:
+            security = Security(symbol=symbol)
+        updated_security = update_security(headers, security, nse)
+        updated_security.save()
         trade_book.processed = True
         trade_book.save()
 
 
-def update_security(headers, security_id, nse):
-    security = Security.objects.get(id=security_id)
+def update_security(headers, security, nse):
     if not nse:
         nse = NSEScrapper(headers)
 
@@ -60,4 +62,4 @@ def update_security(headers, security_id, nse):
 
     security.last_updated_price = price_info.get("lastPrice")
     security.price_modified_datetime = datetime.datetime.now()
-    security.save()
+    return security
