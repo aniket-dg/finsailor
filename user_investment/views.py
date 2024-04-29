@@ -39,10 +39,22 @@ class UserInvestment:
         ).filter(process_filters)
         self.user = user
         self.headers = headers
-        self.nse = NSEScrapper(headers=headers)
+        self.nse = NSEScrapper()
         self._error_in_update_all_securities = False
         self._errors_in_securities = list()
         self._bulk_updated_securities = []
+        self.historical_price_info_mapping = {
+            "open": "CH_OPENING_PRICE",
+            "vwap": "VWAP",
+            "close": "CH_CLOSING_PRICE",
+            "lastPrice": "CH_LAST_TRADED_PRICE",
+            "previousClose": "CH_PREVIOUS_CLS_PRICE",
+            "intraDayHighLow": {
+                "max": "CH_TRADE_HIGH_PRICE",
+                "min": "CH_TRADE_LOW_PRICE",
+                "value": "CH_CLOSING_PRICE",
+            },
+        }
 
     def process_trade_books(self):
         for trade_book in self.tradebooks_to_process:
@@ -151,6 +163,61 @@ class UserInvestment:
         """
         security = Security.objects.filter(id=security_id)
         historical_price_info = security.historical_price_info
+
+    def update_security_for_historical_prices(self, security_id, from_year=1980):
+        security = Security.objects.filter(id=security_id).last()
+        from_date = datetime.datetime(from_year, 1, 1)
+        today_date = datetime.datetime.now()
+        historical_db_price_info = security.historical_price_info
+
+        while from_date < today_date:
+            to_date = from_date + datetime.timedelta(days=30)
+            print(from_date, "->", to_date)
+            data, status = self.nse.get_historical_data_by_symbol(
+                security.symbol, from_date, to_date
+            )
+            from_date = to_date
+
+            if status == 200:
+                historical_db_price_info = (
+                    self.update_historical_info_for_day_to_db_field(
+                        historical_db_price_info, data
+                    )
+                )
+
+        security.historical_price_info = historical_db_price_info
+        security.save()
+        return historical_db_price_info
+
+    def update_historical_info_for_day_to_db_field(
+        self, historical_db_price_info, market_data
+    ):
+
+        history = self.historical_price_info_mapping
+        intraday_day = self.historical_price_info_mapping["intraDayHighLow"]
+        already_exists_date_values = historical_db_price_info.keys()
+
+        for historical_info in market_data["data"]:
+            if historical_info.get("CH_TIMESTAMP") in already_exists_date_values:
+                print(f"Skipped for date {historical_info.get('CH_TIMESTAMP')}")
+                continue
+            local_history = {}
+            local_intraday_data = {}
+            for k, v in history.items():
+                if k == "intraDayHighLow":
+                    for intraday_key, intraday_value in intraday_day.items():
+                        local_intraday_data[intraday_key] = historical_info.get(
+                            intraday_value
+                        )
+                else:
+                    local_history[k] = historical_info.get(v)
+
+            historical_db_price_info[historical_info.get("CH_TIMESTAMP")] = {
+                "intraDayHighLow": local_intraday_data,
+                **local_history,
+            }
+
+        return historical_db_price_info
 
 
 class InvestmentFilter(FilterSet):
