@@ -1,0 +1,14 @@
+1 : Make endpoint which returns the list of stocks which fails more than given percent e.g. 5%
+    - Make a function to scrap all stocks prices
+
+
+2 : Sector Wise Investment API
+
+3 : Create method to check for holiday on nse
+
+
+4: Scrap all news websites and check for sectors, macro_sectors, industries, investment securities news
+
+5 : separate details page for sector, industry, macro_sector
+    - contains related news,
+    - todays performance

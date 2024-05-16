@@ -1,4 +1,7 @@
+import json
+
 from django.contrib.postgres.fields import ArrayField
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 
 from datahub.models import Security
@@ -11,14 +14,10 @@ class Investment(models.Model):
     )
     quantity = models.IntegerField(default=0)
     avg_price = models.DecimalField(
-        decimal_places=2, null=True, blank=True, max_digits=6
+        decimal_places=4, null=True, blank=True, max_digits=12
     )
-    buying_prices = ArrayField(
-        models.DecimalField(decimal_places=2, max_digits=6), default=list
-    )
-    selling_prices = ArrayField(
-        models.DecimalField(decimal_places=2, max_digits=6), default=list
-    )
+    buying_prices = ArrayField(models.JSONField(default=dict), default=list)
+    selling_prices = ArrayField(models.JSONField(default=dict), default=list)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:

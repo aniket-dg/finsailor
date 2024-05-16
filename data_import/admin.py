@@ -14,7 +14,24 @@ from datahub.models import Broker
 
 @admin.register(TradeBook)
 class TradeBookAdmin(admin.ModelAdmin):
-    list_display = ["id", "order_no", "security", "processed", "investment_processed"]
+    list_display = [
+        "id",
+        "execution_datetime",
+        "security",
+        "buy_sell",
+        "quantity",
+        "order_no",
+        # "processed",
+        # "investment_processed",
+    ]
+
+    list_filter = [
+        "buy_sell",
+        "processed",
+        "investment_processed",
+        "execution_datetime",
+        "security",
+    ]
 
 
 @admin.register(InvestmentBook)

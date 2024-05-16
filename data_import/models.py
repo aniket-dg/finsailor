@@ -20,6 +20,12 @@ class UploadedContractNotePDF(models.Model):
     password = models.CharField(max_length=100, null=True, blank=True)
     processed = models.BooleanField(default=False)
     date = models.DateField(null=True, blank=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="uploaded_contract_notes"
+    )
+
+    def __str__(self):
+        return f"{self.pdf_file.name}"
 
 
 class UploadedDematReportPDF(models.Model):
@@ -31,13 +37,16 @@ class UploadedDematReportPDF(models.Model):
     password = models.CharField(max_length=100, null=True, blank=True)
     processed = models.BooleanField(default=False)
     date = models.DateField(null=True, blank=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="uploaded_demat_reports"
+    )
 
 
 class TradeBook(models.Model):
     symbol = models.CharField(max_length=100, null=True, blank=True)
     isin = models.CharField(max_length=100, null=True, blank=True)
     execution_datetime = models.DateTimeField(null=True, blank=True)
-    order_no = models.CharField(unique=True, max_length=100)
+    order_no = models.CharField(max_length=100)
     security = models.CharField(max_length=100, null=True, blank=True)
     exchange = models.CharField(max_length=100, null=True, blank=True)
     buy_sell = models.CharField(default="B", max_length=10)
@@ -53,6 +62,9 @@ class TradeBook(models.Model):
     investment_processed = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
 
+    class Meta:
+        ordering = ["execution_datetime"]
+
 
 class InvestmentBook(models.Model):
     security = models.CharField(max_length=100, null=True, blank=True)
@@ -60,6 +72,9 @@ class InvestmentBook(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     processed = models.BooleanField(default=False)
     investment_processed = models.BooleanField(default=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="uploaded_investment_books"
+    )
 
     def __str__(self):
         return f"{self.security}"

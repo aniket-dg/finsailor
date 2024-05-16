@@ -1,9 +1,18 @@
 import datetime
+from zoneinfo import ZoneInfo
+import logging
 
+from celery import shared_task
+
+from combo_investment import settings
+from combo_investment.celery import BaseTaskWithRetry
 from data_import.models import TradeBook
-from datahub.models import Security
+from datahub.models import Security, StockIndex, TodayStockIndex
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
+from user_investment.views import UserInvestment
+
+logger = logging.getLogger("Datahub")
 
 
 def process_trade_books(headers=None):
@@ -16,15 +25,16 @@ def process_trade_books(headers=None):
         security = Security.objects.filter(symbol=symbol).last()
         if security is None:
             security = Security(symbol=symbol)
-        updated_security = update_security(headers, security, nse)
+        updated_security = update_security_price(security, nse)
         updated_security.save()
         trade_book.processed = True
         trade_book.save()
 
 
-def update_security(headers, security, nse):
-    if not nse:
-        nse = NSEScrapper(headers)
+@shared_task(base=BaseTaskWithRetry)
+def update_security_price(security_id):
+    security = Security.objects.get(id=security_id)
+    nse = NSEScrapper()
 
     quote, status_code = nse.get_quote_by_symbol(security.symbol)
     if status_code != 200:
@@ -60,6 +70,104 @@ def update_security(headers, security, nse):
     metadata = quote.get("metadata")
     security.metadata = metadata
 
-    security.last_updated_price = price_info.get("lastPrice")
-    security.price_modified_datetime = datetime.datetime.now()
+    security.last_updated_price = (
+        price_info.get("close")
+        if price_info.get("close")
+        else price_info.get("lastPrice")
+    )
+    local_tz = ZoneInfo(settings.TIME_ZONE)
+    security.price_modified_datetime = datetime.datetime.now().astimezone(local_tz)
+    security.save()
+    logger.info(f"{security.symbol} Security updated!")
     return security
+
+
+@shared_task(base=BaseTaskWithRetry)
+def update_all_securities_prices():
+    securities = Security.objects.filter(base_security=True)
+    for sec in securities:
+        update_security_price.delay(sec.id)
+    logger.info("All securities prices updated")
+
+
+@shared_task(base=BaseTaskWithRetry)
+def update_historical_prices(security_id):
+    user_investment = UserInvestment()
+    user_investment.update_security_for_historical_prices(security_id)
+    logger.info(f"Security {security_id} is updated for historical prices.")
+
+
+@shared_task(base=BaseTaskWithRetry)
+def run_every_30_sec():
+    logger.info("Printing every 30 second........")
+
+
+@shared_task(base=BaseTaskWithRetry)
+def update_stock_indices_from_nse():
+    nse = NSEScrapper()
+    stock_indices, status = nse.get_stocks_indices()
+
+    historical_dates_info = stock_indices.get("dates")
+    date_30_day_ago = stock_indices.get("date30dAgo")
+    date_365_day_ago = stock_indices.get("date365dAgo")
+    stock_indices_data = stock_indices.get("data")
+    today_stock_index_indices = []
+
+    stock_index_date = datetime.datetime.strptime(
+        stock_indices.get("timestamp"), "%d-%b-%Y %H:%M"
+    )
+
+    today_stock_index = TodayStockIndex.objects.filter(
+        date=stock_index_date.date()
+    ).last()
+    if today_stock_index is None:
+        today_stock_index = TodayStockIndex(date=stock_index_date.date())
+        today_stock_index.historical_dates_info = historical_dates_info
+        today_stock_index.date_30_day_ago = datetime.datetime.strptime(
+            date_30_day_ago, "%d-%b-%Y"
+        )
+        today_stock_index.date_365_day_ago = datetime.datetime.strptime(
+            date_365_day_ago, "%d-%b-%Y"
+        )
+        today_stock_index.save()
+
+    for stock_index in stock_indices_data:
+        stock_index["date"] = stock_index_date.date()
+        stock_index["time"] = stock_index_date.time()
+        stock_index_obj, created = StockIndex.update_or_create_from_dict(stock_index)
+
+        today_stock_index_indices.append(stock_index_obj.id)
+
+    today_stock_index.stocks_indices.all().delete()
+    today_stock_index.stocks_indices.add(*today_stock_index_indices)
+
+
+@shared_task(base=BaseTaskWithRetry)
+def update_index_stocks(index_id):
+    print("index_id", "sldkfa;lfk;alk;dka;kd", index_id)
+    stock_index = StockIndex.objects.get(id=index_id)
+    nse = NSEScrapper()
+    index_stocks, status = nse.get_index_stocks(index_symbol=stock_index.indexSymbol)
+
+    stocks = index_stocks.get("data")
+
+    if stocks is None:
+        return
+
+    for stock in stocks:
+        security = Security.objects.filter(symbol=stock.get("symbol")).last()
+        if security is None:
+            security = Security(symbol=stock.get("symbol"))
+
+        last_price = stock.get("lastPrice")
+        last_update_time = stock.get("lastUpdateTime")
+
+        last_updated_time = datetime.datetime.strptime(
+            last_update_time, "%d-%b-%Y %H:%M:%S"
+        )
+        security.last_updated_price = last_price
+        security.price_modified_datetime = last_updated_time
+        historical_price_info = security.historical_price_info or {}
+        historical_price_info[last_updated_time.date().isoformat()] = stock
+        security.historical_price_info = historical_price_info
+        security.save()

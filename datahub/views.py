@@ -9,11 +9,14 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from datahub.models import Security
+from datahub.models import Security, GeneralInfo, StockIndex
 from datahub.serializers import (
     SecuritySerializer,
     UpdateSecuritySerializer,
     SecurityFilterSerializer,
+    HistoricalPricesForSecurity,
+    GeneralInfoSerializer,
+    StockIndexSerializer,
 )
 from user_investment.views import UserInvestment
 
@@ -38,8 +41,8 @@ class SecurityViewSet(viewsets.ModelViewSet):
     filterset_class = SecurityFilter
 
     def get_serializer_class(self):
-        if self.action in ["update_security"]:
-            return UpdateSecuritySerializer
+        # if self.action in ["update_security"]:
+        #     return UpdateSecuritySerializer
 
         return SecuritySerializer
 
@@ -51,19 +54,16 @@ class SecurityViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
-    @extend_schema(request=UpdateSecuritySerializer)
+    # @extend_schema()
     @action(
         detail=True,
-        methods=["POST"],
+        methods=["GET"],
         name="update_security",
         url_name="update_security",
     )
     def update_security(self, request, *args, **kwargs):
-        security_serializer = UpdateSecuritySerializer(data=request.data)
-        security_serializer.is_valid(raise_exception=True)
-        headers = security_serializer.validated_data.get("headers")
         security = self.get_object()
-        user_investment = UserInvestment(headers=headers)
+        user_investment = UserInvestment()
         security, status_code = user_investment.update_security(security)
         res = {"status": status_code}
         if status_code != 200:
@@ -100,3 +100,33 @@ class SecurityViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(parameters=[HistoricalPricesForSecurity])
+    @action(
+        detail=True,
+        methods=["GET"],
+        name="update_historical_prices",
+        url_name="update_historical_prices",
+    )
+    def update_historical_prices(self, request, *args, **kwargs):
+        security = self.get_object()
+        from_year = int(self.request.query_params.get("from_year", 1980))
+
+        user_investment = UserInvestment()
+        updated_security = user_investment.update_security_for_historical_prices(
+            security.id, from_year=from_year
+        )
+
+        serialized_security_data = SecuritySerializer(updated_security).data
+        return Response(serialized_security_data, status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=["General Info"])
+class GeneralInfoViewSet(viewsets.ModelViewSet):
+    queryset = GeneralInfo.objects.all()
+    serializer_class = GeneralInfoSerializer
+
+
+class StockIndexViewSet(viewsets.ModelViewSet):
+    queryset = StockIndex.objects.all()
+    serializer_class = StockIndexSerializer

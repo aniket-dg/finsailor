@@ -9,10 +9,10 @@ class UploadedContractNoteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UploadedContractNotePDF
-        fields = ("pdf_file", "broker", "password", "date")
+        fields = ("pdf_file", "broker", "password", "date", "user")
 
 
 class UploadedDematReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = UploadedDematReportPDF
-        fields = ("pdf_file", "broker", "password", "date")
+        fields = ("pdf_file", "broker", "password", "date", "user")

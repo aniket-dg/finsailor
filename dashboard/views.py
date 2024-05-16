@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
 
 from dashboard.serializers import (
     UploadedContractNoteSerializer,
@@ -22,6 +23,9 @@ from data_import.utils import (
     convert_demat_report_to_investment_book_obj,
 )
 from data_import.views import Groww, Zerodha
+from datahub.models import GeneralInfo
+from datahub.serializers import GeneralInfoSerializer
+from datahub.utils import get_general_info_obj
 
 
 @extend_schema(tags=["Dashboard App"])
@@ -39,6 +43,7 @@ class ImportContractNoteData(APIView):
             return Response(serializer.errors)
 
         contract_note = serializer.save()
+
         broker = Zerodha()
         if contract_note.broker == "groww":
             broker = Groww(contract_note.password)
@@ -49,6 +54,10 @@ class ImportContractNoteData(APIView):
         serialized_trade_books = None
         if imported:
             serialized_trade_books = TradeBookSerializer(trade_books, many=True).data
+            general_info = get_general_info_obj()
+            general_info.tradebook_last_uploaded = contract_note.date
+            general_info.save()
+            contract_note.processed = True
 
         return Response(
             {"trades": serialized_trade_books}, status=status.HTTP_201_CREATED
@@ -83,6 +92,7 @@ class ImportDematReportData(APIView):
         )
         serialized_investment_books = None
         if imported:
+            demat_report.processed = True
             serialized_investment_books = InvestmentBookSerializer(
                 investment_books, many=True
             ).data

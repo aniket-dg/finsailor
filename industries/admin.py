@@ -25,6 +25,7 @@ class ModelNameAdmin(admin.ModelAdmin):
 @admin.register(Industry)
 class IndustryAdmin(admin.ModelAdmin):
     list_display = ["id", "ind_code", "name", "sector"]
+    list_filter = ["sector"]
 
 
 @admin.register(BasicIndustry)

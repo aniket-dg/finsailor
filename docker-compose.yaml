@@ -3,7 +3,7 @@ services:
   db:
     image: postgres:15.2-alpine
     ports:
-      - "5436:5432"
+      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     environment:
@@ -11,18 +11,85 @@ services:
       POSTGRES_USER: admin
       POSTGRES_DB: investment_db
 
-#  api:
-#    build: .
-#    # command: python3.11 ./manage.py runserver_plus --print-sql 0.0.0.0:8000
-#    command: python3.11 ./manage.py runserver 0.0.0.0:8001
-#    ports:
-#      - "8001:8001"
-#    volumes:
-#      - .:/code
-#    env_file:
-#      - .env
-#    depends_on:
-#      - db
+  redis:
+    image: redis:6.2
+    ports:
+      - "6379:6379"
+    command: "redis-server --appendonly yes"
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+    environment:
+      PYTHONUNBUFFERED: 1
+      SECRET_KEY: 'Wu7MJeDm87rCvMETqdlKww'
+      DJANGO_DEBUG: 0
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      DATABASE_ENGINE: django.db.backends.postgresql
+      DATABASE_NAME: investment_db
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: admin
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    volumes:
+      - .:/opt/app
+    command: "celery -A combo_investment worker -l info"
+
+  celery_worker_for_sequential_tasks:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+    environment:
+      PYTHONUNBUFFERED: 1
+      SECRET_KEY: 'Wu7MJeDm87rCvMETqdlKww'
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      DATABASE_ENGINE: django.db.backends.postgresql
+      DATABASE_NAME: investment_db
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: admin
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    volumes:
+      - .:/opt/app
+    command: "celery -A combo_investment worker -Q sequential_queue.fifo -l info -c 1"
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+    environment:
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      DATABASE_ENGINE: django.db.backends.postgresql
+      DATABASE_NAME: investment_db
+      DATABASE_USER: admin
+      DATABASE_PASSWORD: admin
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+    volumes:
+      - celerybeat_schedule:/var/run/celery
+      - .:/opt/app
+    command: "celery -A combo_investment beat -l info -s /opt/run/celery/celerybeat-schedule"
+
+  api:
+    build: .
+    command: bash -c "python manage.py migrate && python ./manage.py runserver_plus 0.0.0.0:8001"
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/opt/app
+    depends_on:
+      - db
+    env_file:
+      - .env
 
 volumes:
   db_data:
+  celerybeat_schedule:
+

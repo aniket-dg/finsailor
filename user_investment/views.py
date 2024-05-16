@@ -1,22 +1,32 @@
 import datetime
-from _decimal import Decimal
+import time
+from _decimal import Decimal, ROUND_DOWN, ROUND_UP, ROUND_HALF_UP
+from collections import defaultdict
+from zoneinfo import ZoneInfo
+
 import django_filters
+import logging
 from django.db.models import Q
 from django.db.models import F, ExpressionWrapper, DecimalField, Sum
 from django.shortcuts import render
 from django_filters import FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from combo_investment import settings
+from combo_investment.exception import APIBadRequest
 from data_import.models import TradeBook
-from datahub.models import Security
+from datahub.models import Security, Parameter
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment
 from user_investment.serializer import InvestmentSerializer
+from user_investment.utils import get_securities_by_sector
+
+logger = logging.Logger("UserInvestment")
 
 
 class UserInvestment:
@@ -34,9 +44,11 @@ class UserInvestment:
             process_filters = Q(Q(processed=False) | Q(investment_processed=False))
         elif include == "investment_processed":
             process_filters = Q(investment_processed=False)
-        self.tradebooks_to_process = TradeBook.objects.filter(
-            user=user, exchange__iexact="nse"
-        ).filter(process_filters)
+        self.tradebooks_to_process = (
+            TradeBook.objects.filter(user=user)
+            .filter(process_filters)
+            .order_by("execution_datetime")
+        )
         self.user = user
         self.headers = headers
         self.nse = NSEScrapper()
@@ -112,9 +124,12 @@ class UserInvestment:
         security.metadata = metadata
 
         security.last_updated_price = price_info.get("lastPrice")
-        security.price_modified_datetime = datetime.datetime.now()
+        local_tz = ZoneInfo(settings.TIME_ZONE)
+        security.price_modified_datetime = datetime.datetime.now().astimezone(local_tz)
+        # logger.info(security.price_modified_datetime, "price_modified_datetime")
         security.save()
-        return security, status_code
+        # logger.info(security.price_modified_datetime, "price_modified_datetime")
+        return quote, status_code
 
     def update_all_securities(self, securities):
         for security in securities:
@@ -132,22 +147,31 @@ class UserInvestment:
 
         old_quantity = user_investment.quantity or 0
         old_avg_price = user_investment.avg_price or 0
-
+        print(trade_book.id, security.id, trade_book.buy_sell.lower())
         if trade_book.buy_sell.lower() in ["b", "buy"]:
             new_quantity = trade_book.quantity
-            new_avg_price = abs(Decimal(trade_book.net_rate))
+            net_rate = Decimal(trade_book.net_rate)
+            rounded_net_rate = net_rate.quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+            new_avg_price = abs(rounded_net_rate)
             new_cost = new_avg_price * new_quantity
             old_cost = old_avg_price * old_quantity
 
             avg_price = (new_cost + old_cost) / (old_quantity + new_quantity)
             user_investment.avg_price = avg_price
-            user_investment.buying_prices.append(trade_book.net_rate)
+            user_investment.buying_prices.append(
+                {"net_rate": trade_book.net_rate, "quantity": trade_book.quantity}
+            )
             new_quantity = user_investment.quantity + trade_book.quantity
         else:
-            new_quantity = user_investment.quantity - trade_book.quantity
-            user_investment.selling_prices.append(trade_book.net_rate)
+            new_quantity = user_investment.quantity - abs(trade_book.quantity)
+            user_investment.selling_prices.append(
+                {"net_rate": trade_book.net_rate, "quantity": trade_book.quantity}
+            )
 
         user_investment.quantity = new_quantity
+        print(user_investment.quantity, "user investment ......")
         user_investment.save()
 
     def change_in_value(self, to_date, security_id):
@@ -166,12 +190,15 @@ class UserInvestment:
 
     def update_security_for_historical_prices(self, security_id, from_year=1980):
         security = Security.objects.filter(id=security_id).last()
+        logger.info(
+            f"Updating {security.symbol} for historical prices from year {from_year}"
+        )
         from_date = datetime.datetime(from_year, 1, 1)
         today_date = datetime.datetime.now()
         historical_db_price_info = security.historical_price_info
 
         while from_date < today_date:
-            to_date = from_date + datetime.timedelta(days=30)
+            to_date = from_date + datetime.timedelta(days=365)
             print(from_date, "->", to_date)
             data, status = self.nse.get_historical_data_by_symbol(
                 security.symbol, from_date, to_date
@@ -187,7 +214,11 @@ class UserInvestment:
 
         security.historical_price_info = historical_db_price_info
         security.save()
-        return historical_db_price_info
+        logger.info(
+            f"Updated {security.symbol} for historical prices from year {from_year}"
+        )
+
+        return security
 
     def update_historical_info_for_day_to_db_field(
         self, historical_db_price_info, market_data
@@ -235,7 +266,7 @@ class InvestmentFilter(FilterSet):
         fields = ("id", "symbol")
 
 
-@extend_schema(tags=["Investment App"])
+@extend_schema(tags=["Investment App"], methods=["GET", ""])
 class InvestmentViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = InvestmentFilter
@@ -244,13 +275,19 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         return InvestmentSerializer
 
     def get_queryset(self):
-        qs = Investment.objects.all()
+        qs = Investment.objects.filter(quantity__gt=0)
 
         filter_qs = self.filter_queryset(qs)
 
         return filter_qs
 
     def create(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def update(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @action(
@@ -261,6 +298,43 @@ class InvestmentViewSet(viewsets.ModelViewSet):
     )
     def info(self, *args, **kwargs):
         qs = self.get_queryset()
+        day_change = {}
+        local_tz = ZoneInfo(settings.TIME_ZONE)
+        today = datetime.datetime.now().astimezone(local_tz)
+
+        one_day_changes = []
+
+        market_close_value_time = Parameter.objects.filter(
+            name="CLOSE_PRICE_TIME"
+        ).last()
+
+        for investment in qs:
+            security = investment.security
+            today_data = security.historical_price_info.get(today.date().isoformat())
+            if today_data is None:
+                last_date = sorted(security.historical_price_info.keys())[-1]
+                today_data = security.historical_price_info.get(last_date)
+
+            last_price = Decimal(today_data.get("lastPrice"))
+            if today.time() < market_close_value_time.time:
+                last_price = Decimal(today_data.get("close"))
+
+            last_close = Decimal(today_data.get("previousClose"))
+
+            change = ((last_price - last_close) / last_close) * 100
+            total_change = today_data.get("change") * investment.quantity
+
+            day_change[security.symbol] = {
+                "p_change": change.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+                "change": Decimal(today_data.get("change")).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                ),
+                "total_change": Decimal(total_change).quantize(
+                    Decimal("0.01"), rounding=ROUND_HALF_UP
+                ),
+            }
+
+            one_day_changes.append(total_change)
 
         total_investment_value = (
             qs.annotate(
@@ -286,9 +360,35 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             or 0
         )
 
+        amount_invested = Decimal(total_investment_value).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        total_returns = current_value - amount_invested
+        percentage_returns = ((total_returns / amount_invested) * 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        one_day_change = Decimal(sum(one_day_changes)).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        logger.warning((one_day_change / amount_invested) * 100)
+        one_day_percentage_returns = (
+            (one_day_change / amount_invested) * 100
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        total_returns = total_returns.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        current_value = current_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
         data = {
-            "amount_invested": total_investment_value,
-            "current_value": current_value,
+            "amount_invested": format(amount_invested, ","),
+            "total_returns": f"{total_returns}",
+            "total_preturns": percentage_returns,
+            "one_day_change": f"{one_day_change}",
+            "one_day_pchange": one_day_percentage_returns,
+            "current_value": format(current_value, ","),
+            "day_change": day_change,
+            "sector_wise_portfolio": get_securities_by_sector(qs),
         }
 
+        # time.sleep(3)
         return Response(data=data, status=status.HTTP_200_OK)

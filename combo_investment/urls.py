@@ -9,6 +9,7 @@ from django.urls import path, include
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
+
 schema_view = get_schema_view(
     info=openapi.Info(
         title="Combo Investment API",
@@ -35,4 +36,5 @@ urlpatterns = [
     path("api/dashboard/", include("dashboard.urls")),
     path("api/datahub/", include("datahub.urls")),
     path("api/user_investments/", include("user_investment.urls")),
+    path("api/nse_scrapper/", include("scrapper.urls")),
 ]

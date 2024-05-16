@@ -1,12 +1,17 @@
 import datetime
 import difflib
-import time
 from collections import defaultdict
 
 import requests
+from drf_spectacular.utils import extend_schema
+from rest_framework import viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from combo_investment import settings
+from combo_investment.exception import APIBadRequest
 from datahub.models import SecurityCache
-from fake_useragent import UserAgent
+from scrapper.serializers import SecuritySymbolSerializer
 
 
 def find_max_matching_string(target, string_list):
@@ -49,7 +54,7 @@ class NSEScrapper:
         self.cache = NSECache
         self.session_refresh_interval = session_refresh_interval
         self._session = requests.session()
-        self.base_url = "https://www.nseindia.com"
+        self.base_url = settings.NSE_BASE_URL
         self.create_session()
 
     @classmethod
@@ -89,14 +94,16 @@ class NSEScrapper:
         if response.status_code == 200:
             return response.json(), response.status_code
 
-        return response.text, response.status_code
+        raise APIBadRequest(
+            {"text": response.text, "status_code": response.status_code}
+        )
 
     def get_symbol(self, scrip_name):
         symbol = self.cache.get_symbol(scrip_name=scrip_name)
         if symbol:
             return symbol
 
-        url = f"https://www.nseindia.com/api/search/autocomplete?q={scrip_name}"
+        url = settings.NSE_SEARCH_SYMBOL_API_URL + scrip_name
         print(f"Fetching symbol for security - {scrip_name}")
         response, status_code = self.load_url(url)
         if status_code != 200:
@@ -133,7 +140,7 @@ class NSEScrapper:
         return symbol if symbol else None
 
     def get_quote_by_symbol(self, symbol):
-        url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol}"
+        url = settings.NSE_SYMBOL_QUOTE_API_URL + symbol
         print(f"Fetching Quote for security - {symbol}")
 
         response, status_code = self.load_url(url)
@@ -145,7 +152,7 @@ class NSEScrapper:
         return quote, status_code
 
     def get_historical_data_by_symbol(self, symbol, from_date, to_date):
-        url = "https://www.nseindia.com/api/historical/cm/equity"
+        url = settings.NSE_HISTORICAL_DATA_API_URL
 
         params = {
             "symbol": symbol,
@@ -155,3 +162,34 @@ class NSEScrapper:
         data, status_code = self.load_url(url, params=params)
 
         return data, status_code
+
+    def get_stocks_indices(self):
+        url = settings.NSE_STOCK_INDICES_API_URl
+
+        data, status_code = self.load_url(url)
+
+        return data, status_code
+
+    def get_index_stocks(self, index_symbol):
+        url = settings.NSE_STOCK_INDEX_DETAIL_API_URL + index_symbol
+
+        data, status_code = self.load_url(url)
+
+        return data, status_code
+
+    def get_upcoming_events(self):
+        url = settings.NSE_UPCOMING_EVENTS_API_URL
+
+        data, status_code = self.load_url(url)
+
+        return data, status_code
+
+
+@extend_schema(tags=["NSE Scrapper"])
+class NSEViewSet(APIView):
+    @extend_schema(parameters=[SecuritySymbolSerializer])
+    def get(self, *args, **kwargs):
+        nse = NSEScrapper()
+        symbol = self.request.query_params.get("symbol")
+        quote = nse.get_quote_by_symbol(symbol)
+        return Response(quote)
