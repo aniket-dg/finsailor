@@ -10,6 +10,7 @@ from data_import.models import TradeBook
 from datahub.models import Security, StockIndex, TodayStockIndex
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
+from user_investment.models import Investment
 from user_investment.views import UserInvestment
 
 logger = logging.getLogger("Datahub")
@@ -84,7 +85,15 @@ def update_security_price(security_id):
 
 @shared_task(base=BaseTaskWithRetry)
 def update_all_securities_prices():
-    securities = Security.objects.filter(base_security=True)
+    securities_id_to_exclude = []
+    investments = Investment.objects.all()
+    for investment in investments:
+        update_security_price.delay(investment.security_id)
+        securities_id_to_exclude.append(investment.security_id)
+    securities = Security.objects.filter(base_security=True).exclude(
+        id__in=securities_id_to_exclude
+    )
+
     for sec in securities:
         update_security_price.delay(sec.id)
     logger.info("All securities prices updated")

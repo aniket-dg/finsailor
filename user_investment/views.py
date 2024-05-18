@@ -392,3 +392,16 @@ class InvestmentViewSet(viewsets.ModelViewSet):
 
         # time.sleep(3)
         return Response(data=data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        name="Investment Info",
+        url_name="sector_allocation",
+        url_path="sector_allocation",
+    )
+    def get_sector_allocation(self, *args, **kwargs):
+        qs = self.get_queryset()
+
+        data = get_securities_by_sector(qs, show_zero_allocation_sectors=False)
+        return Response(data=data, status=status.HTTP_200_OK)
