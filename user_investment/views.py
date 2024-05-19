@@ -20,11 +20,15 @@ from combo_investment import settings
 from combo_investment.exception import APIBadRequest
 from data_import.models import TradeBook
 from datahub.models import Security, Parameter
+from datahub.serializers import SecuritySerializerForSectorWisePortfolio
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment
 from user_investment.serializer import InvestmentSerializer
-from user_investment.utils import get_securities_by_sector
+from user_investment.utils import (
+    get_securities_by_sector,
+    get_security_percentage_change,
+)
 
 logger = logging.Logger("UserInvestment")
 
@@ -250,6 +254,42 @@ class UserInvestment:
 
         return historical_db_price_info
 
+    def performance(self):
+        user_investments = Investment.objects.filter(quantity__gt=0)
+        if self.user:
+            user_investments = user_investments.filter(user=self.user)
+
+        top_gainers_security_changes = []
+        top_losers_security_changes = []
+        for investment in user_investments:
+            res = get_security_percentage_change(investment)
+            serialized_security = SecuritySerializerForSectorWisePortfolio(
+                investment.security
+            ).data
+            if res.get("p_change") > 0:
+                top_gainers_security_changes.append(
+                    {"security": serialized_security, **res}
+                )
+            else:
+                top_losers_security_changes.append(
+                    {"security": serialized_security, **res}
+                )
+
+        gainers_sorted_security_changes = sorted(
+            top_gainers_security_changes,
+            key=lambda item: item["p_change"],
+            reverse=True,
+        )
+        losers_sorted_security_changes = sorted(
+            top_losers_security_changes, key=lambda item: item["p_change"]
+        )
+        res = {
+            "top_gainers": gainers_sorted_security_changes[:5],
+            "top_losers": losers_sorted_security_changes[:5],
+        }
+
+        return res
+
 
 class InvestmentFilter(FilterSet):
     symbol = django_filters.CharFilter(method="filter_by_security_symbol")
@@ -297,44 +337,17 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         url_name="info",
     )
     def info(self, *args, **kwargs):
+        user_investment = UserInvestment()
         qs = self.get_queryset()
         day_change = {}
-        local_tz = ZoneInfo(settings.TIME_ZONE)
-        today = datetime.datetime.now().astimezone(local_tz)
-
         one_day_changes = []
-
-        market_close_value_time = Parameter.objects.filter(
-            name="CLOSE_PRICE_TIME"
-        ).last()
 
         for investment in qs:
             security = investment.security
-            today_data = security.historical_price_info.get(today.date().isoformat())
-            if today_data is None:
-                last_date = sorted(security.historical_price_info.keys())[-1]
-                today_data = security.historical_price_info.get(last_date)
+            security_data = get_security_percentage_change(investment)
+            day_change[security.symbol] = security_data
 
-            last_price = Decimal(today_data.get("lastPrice"))
-            if today.time() < market_close_value_time.time:
-                last_price = Decimal(today_data.get("close"))
-
-            last_close = Decimal(today_data.get("previousClose"))
-
-            change = ((last_price - last_close) / last_close) * 100
-            total_change = today_data.get("change") * investment.quantity
-
-            day_change[security.symbol] = {
-                "p_change": change.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
-                "change": Decimal(today_data.get("change")).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                ),
-                "total_change": Decimal(total_change).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                ),
-            }
-
-            one_day_changes.append(total_change)
+            one_day_changes.append(security_data.get("total_change"))
 
         total_investment_value = (
             qs.annotate(
@@ -388,6 +401,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             "current_value": format(current_value, ","),
             "day_change": day_change,
             "sector_wise_portfolio": get_securities_by_sector(qs),
+            "performance": user_investment.performance(),
         }
 
         # time.sleep(3)

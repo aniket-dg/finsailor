@@ -1,8 +1,12 @@
+import datetime
 import logging
+from _decimal import Decimal, ROUND_HALF_UP
+from zoneinfo import ZoneInfo
 
 from django.db.models import Sum
 
-from datahub.models import Security
+from combo_investment import settings
+from datahub.models import Security, Parameter
 from datahub.serializers import (
     SecuritySerializer,
     SecuritySerializerForSectorWisePortfolio,
@@ -323,3 +327,37 @@ def get_security_allocation(total_securities, investments):
         securities.append(security_data)
 
     return securities
+
+
+def get_security_percentage_change(investment):
+    security = investment.security
+    market_close_value_time = Parameter.objects.filter(name="CLOSE_PRICE_TIME").last()
+
+    local_tz = ZoneInfo(settings.TIME_ZONE)
+    today = datetime.datetime.now().astimezone(local_tz)
+    today_data = security.historical_price_info.get(today.date().isoformat())
+
+    if today_data is None:
+        last_date = sorted(security.historical_price_info.keys())[-1]
+        today_data = security.historical_price_info.get(last_date)
+
+    last_price = Decimal(today_data.get("lastPrice"))
+    if today.time() < market_close_value_time.time:
+        last_price = Decimal(today_data.get("close"))
+
+    last_close = Decimal(today_data.get("previousClose"))
+
+    change = ((last_price - last_close) / last_close) * 100
+    total_change = today_data.get("change") * investment.quantity
+
+    res = {
+        "p_change": change.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+        "change": Decimal(today_data.get("change")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        ),
+        "total_change": Decimal(total_change).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        ),
+    }
+
+    return res
