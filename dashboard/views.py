@@ -12,10 +12,15 @@ from rest_framework.viewsets import ModelViewSet
 from dashboard.serializers import (
     UploadedContractNoteSerializer,
     UploadedDematReportSerializer,
+    UploadedMutualFundReportSerializer,
 )
 from data_import.forms import TradeBookForm
 from data_import.models import TradeBook, InvestmentBook
-from data_import.serializers import TradeBookSerializer, InvestmentBookSerializer
+from data_import.serializers import (
+    TradeBookSerializer,
+    InvestmentBookSerializer,
+    MutualFundBookSerializer,
+)
 from data_import.utils import (
     extract_groww_data_from_contract_note,
     convert_groww_trade_book_data_to_trade_obj,
@@ -26,6 +31,7 @@ from data_import.views import Groww, Zerodha
 from datahub.models import GeneralInfo
 from datahub.serializers import GeneralInfoSerializer
 from datahub.utils import get_general_info_obj
+from mutual_funds.views import MutualFund
 
 
 @extend_schema(tags=["Dashboard App"])
@@ -99,5 +105,40 @@ class ImportDematReportData(APIView):
 
         return Response(
             {"investment_books": serialized_investment_books},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+@extend_schema(tags=["Dashboard App"])
+class MutualFundReportData(APIView):
+    parser_classes = (MultiPartParser, FormParser)
+
+    @extend_schema(
+        request=UploadedMutualFundReportSerializer,
+        responses={201: InvestmentBookSerializer(many=True)},
+    )
+    def post(self, *args, **kwargs):
+        serializer = UploadedMutualFundReportSerializer(data=self.request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors)
+
+        if serializer.validated_data.get("broker") != "groww":
+            return Response(
+                {
+                    "message": "Currently not available to process Zerodha Mutual Fund Report"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        mf_report = serializer.save()
+
+        broker = MutualFund(dry_run=False)
+
+        mf_books = broker.import_data_from_report(file_path=mf_report.excel_file.path)
+
+        serialized_investment_books = MutualFundBookSerializer(mf_books, many=True).data
+
+        return Response(
+            {"mf_books": serialized_investment_books},
             status=status.HTTP_201_CREATED,
         )

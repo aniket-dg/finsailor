@@ -19,6 +19,7 @@ from rest_framework.response import Response
 from combo_investment import settings
 from combo_investment.exception import APIBadRequest
 from data_import.models import TradeBook
+from data_import.serializers import TradeBookSerializer
 from datahub.models import Security, Parameter
 from datahub.serializers import SecuritySerializerForSectorWisePortfolio
 from industries.views import get_basic_industry_object_from_industry_info
@@ -312,6 +313,8 @@ class InvestmentViewSet(viewsets.ModelViewSet):
     filterset_class = InvestmentFilter
 
     def get_serializer_class(self):
+        if self.action in ["list"]:
+            return InvestmentSerializer
         return InvestmentSerializer
 
     def get_queryset(self):
@@ -419,3 +422,42 @@ class InvestmentViewSet(viewsets.ModelViewSet):
 
         data = get_securities_by_sector(qs, show_zero_allocation_sectors=False)
         return Response(data=data, status=status.HTTP_200_OK)
+
+
+class TransactionFilter(FilterSet):
+    # symbol = django_filters.CharFilter(method="filter_by_security_symbol")
+
+    # name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
+    # id = django_filters.CharFilter(method="filter_by_ids")
+    #
+    # def filter_by_security_symbol(self, queryset, name, value):
+    #     symbols = value.split(",")
+    #     return queryset.filter(security__symbol__in=symbols)
+
+    class Meta:
+        model = TradeBook
+        fields = (
+            "id",
+            "symbol",
+            "buy_sell",
+            "broker",
+            "processed",
+            "investment_processed",
+            "user",
+            "execution_datetime",
+        )
+
+
+@extend_schema(tags=["Transaction App"], methods=["GET", ""])
+class TransactionViewSet(viewsets.ModelViewSet):
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = TransactionFilter
+
+    def get_queryset(self):
+        last_trade_book = TradeBook.objects.order_by("execution_datetime").last()
+        date = last_trade_book.execution_datetime.date()
+        trade_books = TradeBook.objects.filter(execution_datetime__date=date)
+        return trade_books
+
+    def get_serializer_class(self):
+        return TradeBookSerializer

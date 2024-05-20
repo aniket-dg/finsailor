@@ -6,6 +6,7 @@ from . import views
 
 router = routers.SimpleRouter()
 router.register(r"investment", views.InvestmentViewSet, basename="Investment")
+router.register(r"transactions", views.TransactionViewSet, basename="Transaction")
 
 
 urlpatterns = [

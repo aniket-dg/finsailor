@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "user_investment",
     "scrapper",
     "news",
+    "mutual_funds",
 ]
 
 MIDDLEWARE = [

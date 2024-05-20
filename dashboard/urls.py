@@ -3,7 +3,6 @@ from rest_framework import routers
 
 from . import views
 
-
 # router = routers.SimpleRouter()
 # router.register(
 # r"security", views.ImportContractNoteData, basename="ImportContractNoteData"
@@ -20,5 +19,10 @@ urlpatterns = [
         "import/demat-report/",
         views.ImportDematReportData.as_view(),
         name="import-demat",
+    ),
+    path(
+        "import/mf-report/",
+        views.MutualFundReportData.as_view(),
+        name="import-mf",
     ),
 ]

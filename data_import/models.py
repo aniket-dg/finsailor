@@ -42,6 +42,19 @@ class UploadedDematReportPDF(models.Model):
     )
 
 
+class UploadedMutualFundReport(models.Model):
+    BrokerTypes = ((field.name, field.value) for field in BrokerEnum)
+    excel_file = models.FileField(upload_to="excel_files/mutual_funds/")
+    broker = models.CharField(
+        max_length=100, choices=BrokerTypes, null=True, blank=True
+    )
+    processed = models.BooleanField(default=False)
+    date = models.DateField(null=True, blank=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="uploaded_mutual_fund_reports"
+    )
+
+
 class TradeBook(models.Model):
     symbol = models.CharField(max_length=100, null=True, blank=True)
     isin = models.CharField(max_length=100, null=True, blank=True)
@@ -69,12 +82,30 @@ class TradeBook(models.Model):
 class InvestmentBook(models.Model):
     security = models.CharField(max_length=100, null=True, blank=True)
     quantity = models.IntegerField(default=0)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     processed = models.BooleanField(default=False)
     investment_processed = models.BooleanField(default=False)
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="uploaded_investment_books"
+        User,
+        on_delete=models.CASCADE,
+        related_name="uploaded_investment_books",
+        null=True,
+        blank=True,
     )
 
     def __str__(self):
         return f"{self.security}"
+
+
+class MutualFundBook(models.Model):
+    scheme_name = models.CharField(max_length=500)
+    transaction_type = models.CharField(max_length=100)
+    units = models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)
+    nav = models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)
+    amount = models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)
+    date = models.DateField(null=True, blank=True)
+    processed = models.BooleanField(default=False)
+    investment_processed = models.BooleanField(default=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.scheme_name}-{self.units}"

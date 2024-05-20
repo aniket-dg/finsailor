@@ -5,6 +5,8 @@ from data_import.models import (
     InvestmentBook,
     UploadedContractNotePDF,
     UploadedDematReportPDF,
+    MutualFundBook,
+    UploadedMutualFundReport,
 )
 from datahub.models import Broker
 
@@ -35,11 +37,23 @@ class TradeBookAdmin(admin.ModelAdmin):
 
 
 @admin.register(InvestmentBook)
-class ModelNameAdmin(admin.ModelAdmin):
+class InvestmentBookAdmin(admin.ModelAdmin):
     list_display = ["id", "security", "quantity", "processed", "investment_processed"]
 
 
-# admin.site.register(InvestmentBook)
+@admin.register(MutualFundBook)
+class MutualFundBookAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "scheme_name",
+        "transaction_type",
+        "units",
+        "processed",
+        "investment_processed",
+    ]
+
+
 admin.site.register(Broker)
 admin.site.register(UploadedContractNotePDF)
 admin.site.register(UploadedDematReportPDF)
+admin.site.register(UploadedMutualFundReport)

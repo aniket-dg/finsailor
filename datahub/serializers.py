@@ -1,3 +1,5 @@
+from _decimal import Decimal, ROUND_HALF_UP
+
 from rest_framework import serializers
 
 from datahub.models import Security, GeneralInfo, StockIndex
@@ -19,6 +21,13 @@ class SecuritySerializerForSectorWisePortfolio(serializers.ModelSerializer):
 
 
 class SecurityListSerializer(serializers.ModelSerializer):
+    last_updated_price = serializers.SerializerMethodField()
+
+    def get_last_updated_price(self, security):
+        return Decimal(security.last_updated_price).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
     class Meta:
         model = Security
         fields = [
