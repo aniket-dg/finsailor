@@ -99,11 +99,10 @@ class InvestmentBook(models.Model):
 class MutualFundBook(models.Model):
     scheme_name = models.CharField(max_length=500)
     transaction_type = models.CharField(max_length=100)
-    units = models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)
-    nav = models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)
+    units = models.FloatField(blank=True, null=True)
+    nav = models.FloatField(blank=True, null=True)
     amount = models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)
     date = models.DateField(null=True, blank=True)
-    processed = models.BooleanField(default=False)
     investment_processed = models.BooleanField(default=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
 

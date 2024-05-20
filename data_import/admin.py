@@ -47,10 +47,12 @@ class MutualFundBookAdmin(admin.ModelAdmin):
         "id",
         "scheme_name",
         "transaction_type",
+        "nav",
         "units",
-        "processed",
+        "date",
         "investment_processed",
     ]
+    list_filter = ["scheme_name"]
 
 
 admin.site.register(Broker)

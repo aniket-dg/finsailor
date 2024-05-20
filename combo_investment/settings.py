@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "scrapper",
     "news",
     "mutual_funds",
+    "groww",
 ]
 
 MIDDLEWARE = [
@@ -217,3 +218,7 @@ NSE_STOCK_INDEX_DETAIL_API_URL = (
     "https://www.nseindia.com/api/equity-stockIndices?index="
 )
 NSE_UPCOMING_EVENTS_API_URL = "https://www.nseindia.com/api/event-calendar?"
+
+
+GROWW_MF_INVESTMENT_DASHBOARD = "https://groww.in/v1/api/aggregator/v2/dashboard"
+GROWW_MF_SCHEME_DETAILS = "https://groww.in/v1/api/bse/v1/scheme/details"

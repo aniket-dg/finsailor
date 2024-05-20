@@ -34,7 +34,9 @@ urlpatterns = [
     ),
     path("admin/", admin.site.urls),
     path("api/dashboard/", include("dashboard.urls")),
+    path("api/groww/", include("groww.urls")),
     path("api/datahub/", include("datahub.urls")),
     path("api/user_investments/", include("user_investment.urls")),
+    path("api/user_investments/mutual_funds/", include("mutual_funds.urls")),
     path("api/nse_scrapper/", include("scrapper.urls")),
 ]
