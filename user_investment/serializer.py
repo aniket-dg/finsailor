@@ -32,27 +32,16 @@ class InvestmentSerializer(serializers.ModelSerializer):
         ]
 
     def get_amount_invested(self, investment):
-        broker = self.context.get("broker")
-        broker_investments = investment.get_broker_investments(broker)
-        amount_invested = 0
-        for broker_investment in broker_investments:
-            amount_invested += broker_investment.quantity * broker_investment.avg_price
-
-        logger.warning(broker_investments)
-        return Decimal(amount_invested).quantize(
+        return Decimal(investment.quantity * investment.avg_price).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
     def get_returns(self, investment):
-        broker = self.context.get("broker")
-        broker_investments = investment.get_broker_investments(broker)
-
-        invested_value = self.get_amount_invested(investment=investment)
-        quantities = sum(broker_investments.values_list("quantity", flat=True))
-        current_value = investment.security.last_updated_price * quantities
+        invested_value = investment.quantity * investment.avg_price
+        current_value = investment.security.last_updated_price * investment.quantity
         returns = current_value - invested_value
         res = {
-            "calculate_current_value": Decimal(current_value).quantize(
+            "current_value": Decimal(current_value).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP
             ),
             "change": Decimal(returns).quantize(

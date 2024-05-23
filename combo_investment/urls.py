@@ -38,6 +38,7 @@ urlpatterns = [
     path("api/datahub/", include("datahub.urls")),
     path("api/data_import/", include("data_import.urls")),
     path("api/user_investments/", include("user_investment.urls")),
+    path("api/industry/", include("industries.urls")),
     path("api/user_investments/mutual_funds/", include("mutual_funds.urls")),
     path("api/nse_scrapper/", include("scrapper.urls")),
 ]

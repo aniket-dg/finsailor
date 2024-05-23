@@ -24,7 +24,7 @@ from datahub.models import Security, Parameter
 from datahub.serializers import SecuritySerializerForSectorWisePortfolio
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
-from user_investment.models import Investment, BrokerInvestment
+from user_investment.models import Investment
 from user_investment.serializer import InvestmentSerializer
 from user_investment.utils import (
     get_securities_by_sector,
@@ -86,29 +86,12 @@ class UserInvestment:
             self.update_security(security)
             trade_book.processed = True
 
-            broker_investment = self.create_broker_investment(
-                tradebook=trade_book, security=security
-            )
             self.update_user_investment(
                 trade_book=trade_book,
                 security=security,
-                broker_investment=broker_investment,
             )
             trade_book.investment_processed = True
             trade_book.save()
-
-    def create_broker_investment(self, tradebook, security):
-        broker_investment = BrokerInvestment(
-            security_id=security.id,
-            quantity=tradebook.quantity,
-            avg_price=tradebook.net_rate,
-            user=self.user,
-            broker=tradebook.broker,
-            execution_datetime=tradebook.execution_datetime,
-            trade_book=tradebook,
-        )
-        broker_investment.save()
-        return broker_investment
 
     def update_security(self, security, bulk_update=False):
         quote, status_code = self.nse.get_quote_by_symbol(security.symbol)
@@ -151,9 +134,7 @@ class UserInvestment:
         security.last_updated_price = price_info.get("lastPrice")
         local_tz = ZoneInfo(settings.TIME_ZONE)
         security.price_modified_datetime = datetime.datetime.now().astimezone(local_tz)
-        # logger.info(security.price_modified_datetime, "price_modified_datetime")
         security.save()
-        # logger.info(security.price_modified_datetime, "price_modified_datetime")
         return quote, status_code
 
     def update_all_securities(self, securities):
@@ -163,16 +144,17 @@ class UserInvestment:
 
         return self._bulk_updated_securities, self._errors_in_securities
 
-    def update_user_investment(self, trade_book, security, broker_investment):
+    def update_user_investment(self, trade_book, security):
         user_investment = Investment.objects.filter(
-            user=self.user, security=security
+            user=self.user, security=security, broker=trade_book.broker
         ).last()
         if user_investment is None:
-            user_investment = Investment(user=self.user, security=security)
+            user_investment = Investment(
+                user=self.user, security=security, broker=trade_book.broker
+            )
 
         old_quantity = user_investment.quantity or 0
         old_avg_price = user_investment.avg_price or 0
-        print(trade_book.id, security.id, trade_book.buy_sell.lower())
         if trade_book.buy_sell.lower() in ["b", "buy"]:
             new_quantity = trade_book.quantity
             net_rate = Decimal(trade_book.net_rate)
@@ -196,9 +178,6 @@ class UserInvestment:
             )
 
         user_investment.quantity = new_quantity
-        print(user_investment.quantity, "user investment ......")
-        user_investment.save()
-        user_investment.broker_investments.add(broker_investment)
         user_investment.save()
 
     def update_security_for_historical_prices(self, security_id, from_year=1980):
@@ -264,11 +243,11 @@ class UserInvestment:
         return historical_db_price_info
 
     def performance(self, broker="all"):
-        if broker == "all":
+        if broker.lower() == "all":
             user_investments = Investment.objects.filter(quantity__gt=0)
         else:
             user_investments = Investment.objects.filter(
-                quantity__gt=0, broker_investments__broker=broker
+                quantity__gt=0, broker=broker
             ).distinct()
 
         if self.user:
@@ -277,7 +256,7 @@ class UserInvestment:
         top_gainers_security_changes = []
         top_losers_security_changes = []
         for investment in user_investments:
-            res = get_security_percentage_change(investment, broker=broker)
+            res = get_security_percentage_change(investment)
             serialized_security = SecuritySerializerForSectorWisePortfolio(
                 investment.security
             ).data
@@ -325,7 +304,7 @@ class InvestmentFilter(FilterSet):
 
     class Meta:
         model = Investment
-        fields = ("id", "symbol")
+        fields = ("id", "symbol", "broker")
 
 
 @extend_schema(tags=["Investment App"])
@@ -349,7 +328,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         if broker is None or broker.lower() == "all":
             qs = Investment.objects.filter(quantity__gt=0)
         else:
-            qs = Investment.objects.filter(broker_investments__broker=broker).distinct()
+            qs = Investment.objects.filter(broker=broker, quantity__gt=0)
 
         filter_qs = self.filter_queryset(qs)
 
@@ -381,33 +360,54 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         total_current_value = 0
 
         for investment in qs:
-            total_investment_value += investment.calculate_amount_invested(
-                broker=broker
-            )
-            total_current_value += investment.calculate_current_value(broker=broker)
+            # total_investment_value += investment.calculate_amount_invested(
+            #     broker=broker
+            # )
+            # total_current_value += investment.calculate_current_value(broker=broker)
             security = investment.security
-            security_data = get_security_percentage_change(investment, broker=broker)
+            security_data = get_security_percentage_change(investment)
             day_change[security.symbol] = security_data
 
             one_day_changes.append(security_data.get("total_change"))
 
-        amount_invested = Decimal(total_investment_value).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
+        total_investment_value = (
+            qs.annotate(
+                total_value=ExpressionWrapper(
+                    F("avg_price") * F("quantity"),
+                    output_field=DecimalField(decimal_places=2, max_digits=12),
+                )
+            ).aggregate(total_investment_value=Sum("total_value"))[
+                "total_investment_value"
+            ]
+            or 0
         )
 
-        total_returns = total_current_value - amount_invested
-        logger.warning((total_returns, amount_invested, "asjdf;lkjas;fk;kasdf"))
-        percentage_returns = Decimal((total_returns / amount_invested) * 100).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
+        current_value = (
+            qs.annotate(
+                total_value=ExpressionWrapper(
+                    F("security__last_updated_price") * F("quantity"),
+                    output_field=DecimalField(decimal_places=2, max_digits=12),
+                )
+            ).aggregate(total_investment_value=Sum("total_value"))[
+                "total_investment_value"
+            ]
+            or 0
         )
+        percentage_returns = Decimal(
+            (current_value / total_investment_value) * 100
+        ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
         one_day_change = Decimal(sum(one_day_changes)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
-        logger.warning((one_day_change / amount_invested) * 100)
         one_day_percentage_returns = (
-            (one_day_change / amount_invested) * 100
+            (one_day_change / total_investment_value) * 100
         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        amount_invested = Decimal(total_investment_value).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        total_returns = current_value - amount_invested
         total_returns = total_returns.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         current_value = Decimal(total_current_value).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
@@ -421,7 +421,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             "one_day_pchange": one_day_percentage_returns,
             "current_value": format(current_value, ","),
             "day_change": day_change,
-            "sector_wise_portfolio": get_securities_by_sector(qs, broker=broker),
+            "sector_wise_portfolio": get_securities_by_sector(qs),
             "performance": user_investment.performance(broker=broker),
         }
 
@@ -442,21 +442,20 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         # logger.warning(broker)
         # logger.warning("-------------------")
 
-        data = get_securities_by_sector(
-            qs, show_zero_allocation_sectors=False, broker=broker
-        )
+        data = get_securities_by_sector(qs, show_zero_allocation_sectors=False)
         return Response(data=data, status=status.HTTP_200_OK)
 
 
 class TransactionFilter(FilterSet):
-    # symbol = django_filters.CharFilter(method="filter_by_security_symbol")
+    broker = django_filters.CharFilter(method="filter_by_broker")
 
     # name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
     # id = django_filters.CharFilter(method="filter_by_ids")
     #
-    # def filter_by_security_symbol(self, queryset, name, value):
-    #     symbols = value.split(",")
-    #     return queryset.filter(security__symbol__in=symbols)
+    def filter_by_broker(self, queryset, name, value):
+        if value.lower() == "all":
+            return queryset
+        return queryset.filter(broker=value)
 
     class Meta:
         model = TradeBook

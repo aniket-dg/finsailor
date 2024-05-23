@@ -1,3 +1,4 @@
+import logging
 from _decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
@@ -14,10 +15,18 @@ class SecuritySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+logger = logging.Logger("UserInvestment - Serializers")
+
+
 class SecuritySerializerForSectorWisePortfolio(serializers.ModelSerializer):
+    broker = serializers.SerializerMethodField()
+
     class Meta:
         model = Security
-        fields = ["name", "symbol"]
+        fields = ["name", "symbol", "broker"]
+
+    def get_broker(self, security):
+        return self.context.get("broker")
 
 
 class SecurityListSerializer(serializers.ModelSerializer):

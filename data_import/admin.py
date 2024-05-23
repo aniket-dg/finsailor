@@ -20,6 +20,7 @@ class TradeBookAdmin(admin.ModelAdmin):
         "id",
         "execution_datetime",
         "security",
+        "broker",
         "buy_sell",
         "quantity",
         "order_no",
@@ -28,6 +29,7 @@ class TradeBookAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
+        "broker",
         "buy_sell",
         "processed",
         "investment_processed",

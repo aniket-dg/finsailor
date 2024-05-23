@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from datahub.models import Security
-from user_investment.models import Investment, BrokerInvestment
+from user_investment.models import Investment
 from django.contrib.admin import SimpleListFilter
 
 
@@ -20,21 +20,18 @@ class SecurityFilter(SimpleListFilter):
         return queryset
 
 
-@admin.register(BrokerInvestment)
-class ModelNameAdmin(admin.ModelAdmin):
-    list_display = ["id", "security", "quantity", "avg_price", "broker"]
-    list_filter = [SecurityFilter, "broker"]
-
-
 @admin.register(Investment)
 class InvestmentAdmin(admin.ModelAdmin):
     list_display = [
         "id",
         "security",
+        "broker",
         "avg_price",
         "quantity",
         "get_basic_industry",
     ]
+
+    list_filter = ["broker", SecurityFilter]
 
     def get_basic_industry(self, obj):
         return obj.security.basic_industry
