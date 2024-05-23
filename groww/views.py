@@ -1,15 +1,22 @@
 import json
+from convert_to_requests import curl_to_requests, to_python_code
 
 import requests
 from django.shortcuts import render
 from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, views
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from combo_investment import settings
 from groww.models import GrowwRequestHeader
-from groww.serializers import GrowwRequestSerializer, SchemeSearchSerializer
+from groww.serializers import (
+    GrowwRequestSerializer,
+    SchemeSearchSerializer,
+    GrowwRequestGETSerializer,
+    SchemeTransactionSerializer,
+)
+from mutual_funds.models import Fund, FundInvestment
 
 # from mutual_funds.models import Fund
 # from mutual_funds.serializers import FundSerializer
@@ -18,6 +25,9 @@ from users.models import User
 
 class GrowwRequest:
     def __init__(self, user=None, http_method="get"):
+        if user is None:
+            user = User.objects.last()
+        self.user = User.objects.last()
         groww_request_headers = GrowwRequestHeader.objects.filter(
             user=user, method=http_method
         ).last()
@@ -38,18 +48,23 @@ class GrowwRequest:
 
         return response.json()
 
-    def get_scheme_details(self, scheme_isin, scheme_type):
-        # Required - POST headers
-
-        body = json.dumps({"isin": scheme_isin, "schemeType": scheme_type})
-        url = settings.GROWW_MF_SCHEME_DETAILS
-
-        response = self._session.post(url, data=body)
-
-        if response.status_code != 200:
-            raise Exception(response.text)
-
-        return response.json()
+    # def get_scheme_details(self, scheme_isin, scheme_type):
+    #     # Required - POST headers
+    #     groww_request_headers = GrowwRequestHeader.objects.filter(
+    #         user=self.user, method="post"
+    #     ).last()
+    #     if groww_request_headers is None:
+    #         raise Exception("Please Set Groww Request Headers first!")
+    #
+    #     body = json.dumps({"isin": scheme_isin, "schemeType": scheme_type})
+    #     url = settings.GROWW_MF_SCHEME_DETAILS
+    #
+    #     response = self._session.post(url, data=body)
+    #
+    #     if response.status_code != 200:
+    #         raise Exception(response.text)
+    #
+    #     return response.json()
 
     def get_scheme_transactions(self, folio_number, scheme_code, page=0, size=100):
         # Required - GET headers
@@ -68,17 +83,54 @@ class GrowwRequest:
 
         return response.json()
 
+    def get_scheme_details(self, search_id: str):
+        url = settings.GROWW_MF_SCHEME_DETAILS + search_id
+        print(url, "url")
+        response = self._session.get(url)
+        if response.status_code != 200:
+            raise Exception((response.text, url))
 
-@extend_schema(tags=["Groww"])
-class GrowwRequestViewSet(viewsets.ModelViewSet):
+        return response.json()
+
+
+class GrowwInvestment:
+    def __init__(self):
+        pass
+
+    def import_mutual_funds(self):
+        groww_request = GrowwRequest()
+
+        all_investments = groww_request.get_mf_investment()
+        holdings = all_investments.get("holdings")
+        for investment in all_investments:
+            pass
+
+    def process_investment(self, investment):
+        fund = Fund.objects.filter(isin=investment["isin"])
+        if fund is None:
+            fund = Fund.create_from_dict(investment)
+
+        fund_investment = FundInvestment
+
+
+@extend_schema(tags=["GrowwRequest"])
+class GrowwRequestHeaderViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
-        if self.action in [""]:
-            return FundSerializer
-        return GrowwRequestSerializer
+        return GrowwRequestGETSerializer
 
     def get_queryset(self):
         return GrowwRequestHeader.objects.all()
 
+    def perform_create(self, serializer):
+        headers = serializer.validated_data.get("headers")
+        req = curl_to_requests(headers)
+        headers = req.headers
+        serializer.validated_data["headers"] = headers
+        serializer.save()
+
+
+@extend_schema(tags=["Groww"])
+class GrowwRequestViewSet(viewsets.ViewSet):
     @action(
         name="Get MF Investment",
         url_name="get_mf_dashboard",
@@ -86,9 +138,7 @@ class GrowwRequestViewSet(viewsets.ModelViewSet):
         detail=False,
     )
     def get_mf_dashboard(self, request, *args, **kwargs):
-        user = User.objects.last()
-        groww = GrowwRequest(user)
-
+        groww = GrowwRequest()
         result = groww.get_mf_investment()
 
         return Response(result)
@@ -102,21 +152,36 @@ class GrowwRequestViewSet(viewsets.ModelViewSet):
     )
     def get_scheme_details(self, request, *args, **kwargs):
         user = User.objects.last()
-        groww = GrowwRequest(user, "post")
+        groww = GrowwRequest(user, "get")
         request_data = SchemeSearchSerializer(data=request.query_params)
         if not request_data.is_valid():
             raise Exception(request_data.errors)
 
         result = groww.get_scheme_details(
-            request_data.validated_data.get("isin"),
-            request_data.validated_data.get("scheme_type"),
+            request_data.validated_data.get("search_id"),
         )
         return Response(result)
 
-    def get_scheme_transactions(self, folio_number, scheme_code, page=0, size=100):
-        pass
+    @extend_schema(parameters=[SchemeTransactionSerializer])
+    @action(
+        name="GET Scheme Transaction",
+        url_name="scheme_transactions",
+        url_path="scheme_transactions",
+        detail=False,
+    )
+    def get_scheme_transactions(self, request, *args, **kwargs):
+        groww = GrowwRequest()
+        params = SchemeTransactionSerializer(data=request.query_params)
+        if not params.is_valid():
+            raise Exception(params.errors)
+        params_data = params.validated_data
+        result = groww.get_scheme_transactions(params_data.get("folio_number"),
+                                               params_data.get("scheme_code"),
+                                               params_data.get("page"),
+                                               params_data.get("size"))
 
-    # @extend_schema(parameters=[SchemeSearchSerializer])
+        return Response(result)
+
     @action(
         name="Add Groww Investment",
         url_name="add_groww_investment",

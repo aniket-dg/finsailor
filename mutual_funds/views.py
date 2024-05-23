@@ -14,6 +14,7 @@ from rest_framework import viewsets
 from data_import.models import MutualFundBook
 from datahub.tasks import update_security_price
 from datahub.models import Security
+from mutual_funds.models import FundInvestment, Fund
 
 # from mutual_funds.models import Fund, FundInvestment
 # from mutual_funds.serializers import FundInvestmentSerializer
@@ -69,9 +70,8 @@ class MutualFund:
         return security
 
     def get_or_create_fund(self, name):
-        pass
-        # fund, created = Fund.objects.get_or_create(scheme_name=name)
-        # return fund
+        fund, created = Fund.objects.get_or_create(scheme_name=name)
+        return fund
 
 
 class MutualFundInvestment:
@@ -92,19 +92,19 @@ class MutualFundInvestment:
                 logger.warning(f"Fund {fund} not found")
                 continue
 
-            # fund_investment = FundInvestment.objects.filter(
-            #     user=self.user, fund_id=fund.id
-            # ).last()
-            # if fund_investment is None:
-            #     fund_investment = FundInvestment(
-            #         user=self.user,
-            #         fund_id=fund.id,
-            #     )
+            fund_investment = FundInvestment.objects.filter(
+                user=self.user, fund_id=fund.id
+            ).last()
+            if fund_investment is None:
+                fund_investment = FundInvestment(
+                    user=self.user,
+                    fund_id=fund.id,
+                )
             nav = Decimal(mf_book.nav)
             units = Decimal(mf_book.units)
-            # fund_investment.nav_purchased.append(nav)
-            # fund_investment.units_purchased.append(units)
-            # fund_investment.units += Decimal(units)
+            fund_investment.nav_purchased.append(nav)
+            fund_investment.units_purchased.append(units)
+            fund_investment.units += Decimal(units)
             #
             # calculate_amount_invested = 0
             # all_nav = fund_investment.nav_purchased
