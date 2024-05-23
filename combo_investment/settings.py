@@ -152,6 +152,24 @@ AUTH_USER_MODEL = "users.User"
 #
 # DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,
+#     "handlers": {
+#         "console": {
+#             "level": "DEBUG",
+#             "class": "logging.StreamHandler",
+#         },
+#     },
+#     "loggers": {
+#         "": {
+#             "handlers": ["console"],
+#             "level": "DEBUG",
+#             "propagate": True,
+#         },
+#     },
+# }
+
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
@@ -222,3 +240,6 @@ NSE_UPCOMING_EVENTS_API_URL = "https://www.nseindia.com/api/event-calendar?"
 
 GROWW_MF_INVESTMENT_DASHBOARD = "https://groww.in/v1/api/aggregator/v2/dashboard"
 GROWW_MF_SCHEME_DETAILS = "https://groww.in/v1/api/bse/v1/scheme/details"
+GROWW_SCHEME_TRANSACTIONS = (
+    "https://groww.in/v1/api/portfolio/v1/transaction/scheme/all"
+)

@@ -16,9 +16,9 @@ from user_investment.views import UserInvestment
 logger = logging.getLogger("Datahub")
 
 
-def process_trade_books(headers=None):
+def process_trade_books():
     trade_books = TradeBook.objects.filter(processed=False)
-    nse = NSEScrapper(headers)
+    nse = NSEScrapper()
     for trade_book in trade_books:
         symbol = nse.get_symbol(trade_book.security)
         if not symbol:
@@ -106,7 +106,10 @@ def update_historical_prices(security_id):
     logger.info(f"Security {security_id} is updated for historical prices.")
 
 
-@shared_task(base=BaseTaskWithRetry)
+@shared_task(
+    base=BaseTaskWithRetry,
+    options={"queue": "scheduled", "retry": True},
+)
 def run_every_30_sec():
     logger.info("Printing every 30 second........")
 

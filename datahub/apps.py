@@ -7,3 +7,5 @@ class DatahubConfig(AppConfig):
 
     def ready(self):
         import combo_investment.celery
+
+        # import datahub.tasks

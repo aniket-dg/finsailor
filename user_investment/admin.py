@@ -1,14 +1,33 @@
 from django.contrib import admin
 
-from user_investment.models import Investment
+from datahub.models import Security
+from user_investment.models import Investment, BrokerInvestment
+from django.contrib.admin import SimpleListFilter
 
-# Register your models here.
-# admin.site.register(Investment)
+
+class SecurityFilter(SimpleListFilter):
+    title = "Security"
+    parameter_name = "security"
+
+    def lookups(self, request, model_admin):
+        security_ids = Investment.objects.all().values_list("security_id", flat=True)
+        securities = Security.objects.filter(id__in=security_ids)
+        return [(s.id, s.name) for s in securities]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(security_id=self.value())
+        return queryset
+
+
+@admin.register(BrokerInvestment)
+class ModelNameAdmin(admin.ModelAdmin):
+    list_display = ["id", "security", "quantity", "avg_price", "broker"]
+    list_filter = [SecurityFilter, "broker"]
 
 
 @admin.register(Investment)
 class InvestmentAdmin(admin.ModelAdmin):
-
     list_display = [
         "id",
         "security",

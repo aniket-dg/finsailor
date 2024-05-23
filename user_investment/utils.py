@@ -16,7 +16,9 @@ from industries.models import MacroSector, Sector, Industry, BasicIndustry
 logger = logging.Logger("UserInvestment - Utils")
 
 
-def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
+def get_securities_by_sector(
+    investments, show_zero_allocation_sectors=True, broker="all"
+):
     sector_wise_portfolio = {
         "basic_industry": {},
         "industry": {},
@@ -24,9 +26,9 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
         "macro_sector": {},
     }
     metadata = {
-        "no_of_stocks": investments.aggregate(total_quantity=Sum("quantity"))[
-            "total_quantity"
-        ],
+        "no_of_stocks": sum(
+            [investment.calculate_quantities(broker) for investment in investments]
+        ),
         "allocation": 100,
     }
 
@@ -58,9 +60,13 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             "id", flat=True
         )
     )
-    macro_sectors_total_securities = sectors_investments.aggregate(
-        total_quantity=Sum("quantity")
-    )["total_quantity"]
+    macro_sectors_total_securities = sum(
+        [
+            sector_investment.calculate_quantities(broker)
+            for sector_investment in sectors_investments
+        ]
+    )
+
     macro_sector_data = {
         "metadata": {
             "no_of_stocks": macro_sectors_total_securities,
@@ -74,7 +80,7 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             ),
         },
         "data": get_macro_sector_allocation(
-            macro_sectors_total_securities, macro_sectors, sectors_investments
+            macro_sectors_total_securities, macro_sectors, sectors_investments, broker
         ),
     }
 
@@ -85,9 +91,12 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             "id", flat=True
         )
     )
-    sectors_total_securities = sectors_investments.aggregate(
-        total_quantity=Sum("quantity")
-    )["total_quantity"]
+    sectors_total_securities = sum(
+        [
+            sector_investment.calculate_quantities(broker)
+            for sector_investment in sectors_investments
+        ]
+    )
     sector_data = {
         "metadata": {
             "no_of_stocks": sectors_total_securities,
@@ -98,7 +107,7 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             ),
         },
         "data": get_sector_allocation(
-            sectors_total_securities, sectors, sectors_investments
+            sectors_total_securities, sectors, sectors_investments, broker
         ),
     }
 
@@ -109,9 +118,12 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             "id", flat=True
         )
     )
-    industries_total_securities = industries_investments.aggregate(
-        total_quantity=Sum("quantity")
-    )["total_quantity"]
+    industries_total_securities = sum(
+        [
+            industries_investment.calculate_quantities(broker)
+            for industries_investment in industries_investments
+        ]
+    )
     industries_data = {
         "metadata": {
             "no_of_stocks": industries_total_securities,
@@ -124,7 +136,7 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             ),
         },
         "data": get_industry_allocation(
-            industries_total_securities, industries, industries_investments
+            industries_total_securities, industries, industries_investments, broker
         ),
     }
 
@@ -133,9 +145,12 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
     basic_industries_investments = investments.filter(
         security__basic_industry__id__in=basic_industries.values_list("id", flat=True)
     )
-    basic_industries_total_securities = basic_industries_investments.aggregate(
-        total_quantity=Sum("quantity")
-    )["total_quantity"]
+    basic_industries_total_securities = sum(
+        [
+            basic_industries_investment.calculate_quantities(broker)
+            for basic_industries_investment in basic_industries_investments
+        ]
+    )
     basic_industries_data = {
         "metadata": {
             "no_of_stocks": basic_industries_total_securities,
@@ -155,6 +170,7 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
             basic_industries_total_securities,
             basic_industries,
             basic_industries_investments,
+            broker,
         ),
     }
 
@@ -164,7 +180,7 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
 
 
 def get_macro_sector_allocation(
-    total_securities, macro_sectors, macro_sectors_investments
+    total_securities, macro_sectors, macro_sectors_investments, broker
 ):
     macro_sector_allocation = {}
     for macro_sector in macro_sectors:
@@ -173,11 +189,11 @@ def get_macro_sector_allocation(
         macro_sector_investments = macro_sectors_investments.filter(
             security__basic_industry__industry__sector__macro_sector__name=macro_sector.name
         )
-        metadata["no_of_stocks"] = (
-            macro_sector_investments.aggregate(total_quantity=Sum("quantity"))[
-                "total_quantity"
+        metadata["no_of_stocks"] = sum(
+            [
+                investment.calculate_quantities(broker)
+                for investment in macro_sector_investments
             ]
-            or 0
         )
 
         sector_allocation = (
@@ -187,7 +203,7 @@ def get_macro_sector_allocation(
         )
         metadata["allocation"] = sector_allocation
         securities = get_security_allocation(
-            metadata["no_of_stocks"], macro_sector_investments
+            metadata["no_of_stocks"], macro_sector_investments, broker
         )
         amount_invested = sum(
             security["metadata"]["amount_invested"] for security in securities
@@ -199,7 +215,7 @@ def get_macro_sector_allocation(
     return macro_sector_allocation
 
 
-def get_sector_allocation(total_securities, sectors, sectors_investments):
+def get_sector_allocation(total_securities, sectors, sectors_investments, broker):
     sector_allocation = {}
     for sector in sectors:
         res = {}
@@ -207,11 +223,11 @@ def get_sector_allocation(total_securities, sectors, sectors_investments):
         sector_investments = sectors_investments.filter(
             security__basic_industry__industry__sector__name=sector.name
         )
-        metadata["no_of_stocks"] = (
-            sector_investments.aggregate(total_quantity=Sum("quantity"))[
-                "total_quantity"
+        metadata["no_of_stocks"] = sum(
+            [
+                investment.calculate_quantities(broker)
+                for investment in sectors_investments
             ]
-            or 0
         )
 
         allocation = (
@@ -221,7 +237,7 @@ def get_sector_allocation(total_securities, sectors, sectors_investments):
         )
         metadata["allocation"] = allocation
         securities = get_security_allocation(
-            metadata["no_of_stocks"], sector_investments
+            metadata["no_of_stocks"], sector_investments, broker
         )
 
         amount_invested = sum(
@@ -234,7 +250,9 @@ def get_sector_allocation(total_securities, sectors, sectors_investments):
     return sector_allocation
 
 
-def get_industry_allocation(total_securities, industries, industries_investments):
+def get_industry_allocation(
+    total_securities, industries, industries_investments, broker
+):
     industries_allocation = {}
     for industry in industries:
         res = {}
@@ -242,11 +260,11 @@ def get_industry_allocation(total_securities, industries, industries_investments
         industry_investments = industries_investments.filter(
             security__basic_industry__industry__name=industry.name
         )
-        metadata["no_of_stocks"] = (
-            industry_investments.aggregate(total_quantity=Sum("quantity"))[
-                "total_quantity"
+        metadata["no_of_stocks"] = sum(
+            [
+                investment.calculate_quantities(broker)
+                for investment in industry_investments
             ]
-            or 0
         )
 
         allocation = (
@@ -256,7 +274,7 @@ def get_industry_allocation(total_securities, industries, industries_investments
         )
         metadata["allocation"] = allocation
         securities = get_security_allocation(
-            metadata["no_of_stocks"], industry_investments
+            metadata["no_of_stocks"], industry_investments, broker
         )
         amount_invested = sum(
             security["metadata"]["amount_invested"] for security in securities
@@ -269,7 +287,7 @@ def get_industry_allocation(total_securities, industries, industries_investments
 
 
 def get_basic_industry_allocation(
-    total_securities, basic_industries, basic_industries_investments
+    total_securities, basic_industries, basic_industries_investments, broker
 ):
     basic_industries_allocation = {}
     for basic_industry in basic_industries:
@@ -278,11 +296,11 @@ def get_basic_industry_allocation(
         basic_industry_investments = basic_industries_investments.filter(
             security__basic_industry__name=basic_industry.name
         )
-        metadata["no_of_stocks"] = (
-            basic_industry_investments.aggregate(total_quantity=Sum("quantity"))[
-                "total_quantity"
+        metadata["no_of_stocks"] = sum(
+            [
+                investment.calculate_quantities(broker)
+                for investment in basic_industry_investments
             ]
-            or 0
         )
 
         allocation = (
@@ -292,7 +310,7 @@ def get_basic_industry_allocation(
         )
         metadata["allocation"] = allocation
         securities = get_security_allocation(
-            metadata["no_of_stocks"], basic_industry_investments
+            metadata["no_of_stocks"], basic_industry_investments, broker
         )
         amount_invested = sum(
             security["metadata"]["amount_invested"] for security in securities
@@ -307,21 +325,25 @@ def get_basic_industry_allocation(
     return basic_industries_allocation
 
 
-def get_security_allocation(total_securities, investments):
+def get_security_allocation(total_securities, investments, broker):
     securities = []
     for investment in investments:
+        quantities = investment.calculate_quantities(broker)
         security_data = {
             "security": SecuritySerializerForSectorWisePortfolio(
                 investment.security
             ).data,
             "metadata": {
-                "no_of_stocks": investment.quantity,
+                "no_of_stocks": quantities,
                 "allocation": (
-                    round(((investment.quantity / total_securities) * 100), 2)
+                    round(
+                        ((quantities / total_securities) * 100),
+                        2,
+                    )
                     if total_securities > 0
                     else 100
                 ),
-                "amount_invested": round(investment.quantity * investment.avg_price, 2),
+                "amount_invested": investment.calculate_amount_invested(broker),
             },
         }
         securities.append(security_data)
@@ -329,7 +351,7 @@ def get_security_allocation(total_securities, investments):
     return securities
 
 
-def get_security_percentage_change(investment):
+def get_security_percentage_change(investment, broker="all"):
     security = investment.security
     market_close_value_time = Parameter.objects.filter(name="CLOSE_PRICE_TIME").last()
 
@@ -348,7 +370,7 @@ def get_security_percentage_change(investment):
     last_close = Decimal(today_data.get("previousClose"))
 
     change = ((last_price - last_close) / last_close) * 100
-    total_change = today_data.get("change") * investment.quantity
+    total_change = today_data.get("change") * investment.calculate_quantities(broker)
 
     res = {
         "p_change": change.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),

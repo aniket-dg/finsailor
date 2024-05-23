@@ -3,8 +3,12 @@ from typing import List
 
 import pandas as pd
 import tabula
+from django_filters.rest_framework import FilterSet, DjangoFilterBackend
+from drf_spectacular.utils import extend_schema
+from rest_framework import viewsets
 
 from data_import.models import TradeBook, InvestmentBook
+from data_import.serializers import TradeBookSerializer
 
 
 class Groww:
@@ -208,3 +212,27 @@ class Zerodha:
             print(f"Total trades imported - {len(trade_books_to_crate)}")
 
         return trade_books, True
+
+
+class TradeBookFilter(FilterSet):
+    # symbol = django_filters.CharFilter(field_name="symbol", lookup_expr="iexact")
+    # name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
+    # id = django_filters.CharFilter(method="filter_by_ids")
+    #
+    # def filter_by_ids(self, queryset, name, value):
+    #     ids = value.split(",")
+    #     return queryset.filter(id__in=ids)
+
+    class Meta:
+        model = TradeBook
+        fields = ("processed", "investment_processed", "broker", "symbol")
+
+
+@extend_schema(tags=["Data Import App"])
+class TradeBookViewSet(viewsets.ModelViewSet):
+    serializer_class = TradeBookSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = TradeBookFilter
+
+    def get_queryset(self):
+        return TradeBook.objects.all()

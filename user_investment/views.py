@@ -11,7 +11,7 @@ from django.db.models import F, ExpressionWrapper, DecimalField, Sum
 from django.shortcuts import render
 from django_filters import FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -24,7 +24,7 @@ from datahub.models import Security, Parameter
 from datahub.serializers import SecuritySerializerForSectorWisePortfolio
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
-from user_investment.models import Investment
+from user_investment.models import Investment, BrokerInvestment
 from user_investment.serializer import InvestmentSerializer
 from user_investment.utils import (
     get_securities_by_sector,
@@ -86,9 +86,29 @@ class UserInvestment:
             self.update_security(security)
             trade_book.processed = True
 
-            self.update_user_investment(trade_book=trade_book, security=security)
+            broker_investment = self.create_broker_investment(
+                tradebook=trade_book, security=security
+            )
+            self.update_user_investment(
+                trade_book=trade_book,
+                security=security,
+                broker_investment=broker_investment,
+            )
             trade_book.investment_processed = True
             trade_book.save()
+
+    def create_broker_investment(self, tradebook, security):
+        broker_investment = BrokerInvestment(
+            security_id=security.id,
+            quantity=tradebook.quantity,
+            avg_price=tradebook.net_rate,
+            user=self.user,
+            broker=tradebook.broker,
+            execution_datetime=tradebook.execution_datetime,
+            trade_book=tradebook,
+        )
+        broker_investment.save()
+        return broker_investment
 
     def update_security(self, security, bulk_update=False):
         quote, status_code = self.nse.get_quote_by_symbol(security.symbol)
@@ -143,7 +163,7 @@ class UserInvestment:
 
         return self._bulk_updated_securities, self._errors_in_securities
 
-    def update_user_investment(self, trade_book, security):
+    def update_user_investment(self, trade_book, security, broker_investment):
         user_investment = Investment.objects.filter(
             user=self.user, security=security
         ).last()
@@ -178,20 +198,8 @@ class UserInvestment:
         user_investment.quantity = new_quantity
         print(user_investment.quantity, "user investment ......")
         user_investment.save()
-
-    def change_in_value(self, to_date, security_id):
-        """
-        This function return the change and pChange to to_date value of particular security
-        :param to_date:
-        :param security_id:
-        :return:
-        {
-            change: decimal
-            pchange: float
-        }
-        """
-        security = Security.objects.filter(id=security_id)
-        historical_price_info = security.historical_price_info
+        user_investment.broker_investments.add(broker_investment)
+        user_investment.save()
 
     def update_security_for_historical_prices(self, security_id, from_year=1980):
         security = Security.objects.filter(id=security_id).last()
@@ -255,15 +263,21 @@ class UserInvestment:
 
         return historical_db_price_info
 
-    def performance(self):
-        user_investments = Investment.objects.filter(quantity__gt=0)
+    def performance(self, broker="all"):
+        if broker == "all":
+            user_investments = Investment.objects.filter(quantity__gt=0)
+        else:
+            user_investments = Investment.objects.filter(
+                quantity__gt=0, broker_investments__broker=broker
+            ).distinct()
+
         if self.user:
             user_investments = user_investments.filter(user=self.user)
 
         top_gainers_security_changes = []
         top_losers_security_changes = []
         for investment in user_investments:
-            res = get_security_percentage_change(investment)
+            res = get_security_percentage_change(investment, broker=broker)
             serialized_security = SecuritySerializerForSectorWisePortfolio(
                 investment.security
             ).data
@@ -294,6 +308,13 @@ class UserInvestment:
 
 class InvestmentFilter(FilterSet):
     symbol = django_filters.CharFilter(method="filter_by_security_symbol")
+    broker = django_filters.ChoiceFilter(
+        choices=(("Groww", "Groww"), ("Zerodha", "Zerodha"), ("All", "All")),
+        method="filter_by_broker",
+    )
+
+    def filter_by_broker(self, queryset, name, value):
+        return queryset
 
     # name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
     # id = django_filters.CharFilter(method="filter_by_ids")
@@ -307,18 +328,28 @@ class InvestmentFilter(FilterSet):
         fields = ("id", "symbol")
 
 
-@extend_schema(tags=["Investment App"], methods=["GET", ""])
+@extend_schema(tags=["Investment App"])
 class InvestmentViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = InvestmentFilter
 
     def get_serializer_class(self):
+        logger.warning(self.request.query_params)
         if self.action in ["list"]:
             return InvestmentSerializer
         return InvestmentSerializer
 
+    def get_serializer(self, *args, **kwargs):
+        kwargs["context"] = self.get_serializer_context()
+        kwargs["context"]["broker"] = self.request.query_params.get("broker", None)
+        return super().get_serializer(*args, **kwargs)
+
     def get_queryset(self):
-        qs = Investment.objects.filter(quantity__gt=0)
+        broker = self.request.query_params.get("broker", None)
+        if broker is None or broker.lower() == "all":
+            qs = Investment.objects.filter(quantity__gt=0)
+        else:
+            qs = Investment.objects.filter(broker_investments__broker=broker).distinct()
 
         filter_qs = self.filter_queryset(qs)
 
@@ -340,48 +371,33 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         url_name="info",
     )
     def info(self, *args, **kwargs):
+        broker = self.request.query_params.get("broker", None)
         user_investment = UserInvestment()
         qs = self.get_queryset()
+        logger.warning(qs.values_list("id", flat=True))
         day_change = {}
         one_day_changes = []
+        total_investment_value = 0
+        total_current_value = 0
 
         for investment in qs:
+            total_investment_value += investment.calculate_amount_invested(
+                broker=broker
+            )
+            total_current_value += investment.calculate_current_value(broker=broker)
             security = investment.security
-            security_data = get_security_percentage_change(investment)
+            security_data = get_security_percentage_change(investment, broker=broker)
             day_change[security.symbol] = security_data
 
             one_day_changes.append(security_data.get("total_change"))
-
-        total_investment_value = (
-            qs.annotate(
-                total_value=ExpressionWrapper(
-                    F("avg_price") * F("quantity"),
-                    output_field=DecimalField(decimal_places=2, max_digits=12),
-                )
-            ).aggregate(total_investment_value=Sum("total_value"))[
-                "total_investment_value"
-            ]
-            or 0
-        )
-
-        current_value = (
-            qs.annotate(
-                total_value=ExpressionWrapper(
-                    F("security__last_updated_price") * F("quantity"),
-                    output_field=DecimalField(decimal_places=2, max_digits=12),
-                )
-            ).aggregate(total_investment_value=Sum("total_value"))[
-                "total_investment_value"
-            ]
-            or 0
-        )
 
         amount_invested = Decimal(total_investment_value).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
-        total_returns = current_value - amount_invested
-        percentage_returns = ((total_returns / amount_invested) * 100).quantize(
+        total_returns = total_current_value - amount_invested
+        logger.warning((total_returns, amount_invested, "asjdf;lkjas;fk;kasdf"))
+        percentage_returns = Decimal((total_returns / amount_invested) * 100).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
@@ -393,7 +409,9 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             (one_day_change / amount_invested) * 100
         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         total_returns = total_returns.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        current_value = current_value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        current_value = Decimal(total_current_value).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
         data = {
             "amount_invested": format(amount_invested, ","),
@@ -403,11 +421,10 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             "one_day_pchange": one_day_percentage_returns,
             "current_value": format(current_value, ","),
             "day_change": day_change,
-            "sector_wise_portfolio": get_securities_by_sector(qs),
-            "performance": user_investment.performance(),
+            "sector_wise_portfolio": get_securities_by_sector(qs, broker=broker),
+            "performance": user_investment.performance(broker=broker),
         }
 
-        # time.sleep(3)
         return Response(data=data, status=status.HTTP_200_OK)
 
     @action(
@@ -418,9 +435,16 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         url_path="sector_allocation",
     )
     def get_sector_allocation(self, *args, **kwargs):
+        broker = self.request.query_params.get("broker", None)
         qs = self.get_queryset()
+        # logger.warning("-------------------")
+        # logger.warning(qs)
+        # logger.warning(broker)
+        # logger.warning("-------------------")
 
-        data = get_securities_by_sector(qs, show_zero_allocation_sectors=False)
+        data = get_securities_by_sector(
+            qs, show_zero_allocation_sectors=False, broker=broker
+        )
         return Response(data=data, status=status.HTTP_200_OK)
 
 
@@ -454,9 +478,13 @@ class TransactionViewSet(viewsets.ModelViewSet):
     filterset_class = TransactionFilter
 
     def get_queryset(self):
-        last_trade_book = TradeBook.objects.order_by("execution_datetime").last()
-        date = last_trade_book.execution_datetime.date()
-        trade_books = TradeBook.objects.filter(execution_datetime__date=date)
+        qs = TradeBook.objects.all()
+        filtered_qs = self.filter_queryset(qs)
+        last_trade_book = filtered_qs.order_by("execution_datetime").last()
+        trade_books = TradeBook.objects.none()
+        if last_trade_book is not None:
+            date = last_trade_book.execution_datetime.date()
+            trade_books = filtered_qs.filter(execution_datetime__date=date)
         return trade_books
 
     def get_serializer_class(self):

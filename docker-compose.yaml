@@ -3,7 +3,7 @@ services:
   db:
     image: postgres:15.2-alpine
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     environment:
@@ -14,7 +14,7 @@ services:
   redis:
     image: redis:6.2
     ports:
-      - "6379:6379"
+      - "6382:6379"
     command: "redis-server --appendonly yes"
 
   celery_worker:
@@ -79,7 +79,7 @@ services:
 
   api:
     build: .
-    command: bash -c "python manage.py migrate && python ./manage.py runserver_plus 0.0.0.0:8001"
+    command: bash -c "python manage.py migrate && python ./manage.py runserver 0.0.0.0:8001"
     ports:
       - "8001:8001"
     volumes:

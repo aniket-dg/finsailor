@@ -14,8 +14,9 @@ from rest_framework import viewsets
 from data_import.models import MutualFundBook
 from datahub.tasks import update_security_price
 from datahub.models import Security
-from mutual_funds.models import Fund, FundInvestment
-from mutual_funds.serializers import FundInvestmentSerializer
+
+# from mutual_funds.models import Fund, FundInvestment
+# from mutual_funds.serializers import FundInvestmentSerializer
 from scrapper.views import NSEScrapper
 
 logger = logging.getLogger("MutualFunds")
@@ -68,8 +69,9 @@ class MutualFund:
         return security
 
     def get_or_create_fund(self, name):
-        fund, created = Fund.objects.get_or_create(scheme_name=name)
-        return fund
+        pass
+        # fund, created = Fund.objects.get_or_create(scheme_name=name)
+        # return fund
 
 
 class MutualFundInvestment:
@@ -90,33 +92,33 @@ class MutualFundInvestment:
                 logger.warning(f"Fund {fund} not found")
                 continue
 
-            fund_investment = FundInvestment.objects.filter(
-                user=self.user, fund_id=fund.id
-            ).last()
-            if fund_investment is None:
-                fund_investment = FundInvestment(
-                    user=self.user,
-                    fund_id=fund.id,
-                )
+            # fund_investment = FundInvestment.objects.filter(
+            #     user=self.user, fund_id=fund.id
+            # ).last()
+            # if fund_investment is None:
+            #     fund_investment = FundInvestment(
+            #         user=self.user,
+            #         fund_id=fund.id,
+            #     )
             nav = Decimal(mf_book.nav)
             units = Decimal(mf_book.units)
-            fund_investment.nav_purchased.append(nav)
-            fund_investment.units_purchased.append(units)
-            fund_investment.units += Decimal(units)
+            # fund_investment.nav_purchased.append(nav)
+            # fund_investment.units_purchased.append(units)
+            # fund_investment.units += Decimal(units)
+            #
+            # calculate_amount_invested = 0
+            # all_nav = fund_investment.nav_purchased
+            # all_units = fund_investment.units_purchased
 
-            amount_invested = 0
-            all_nav = fund_investment.nav_purchased
-            all_units = fund_investment.units_purchased
-
-            for nav, unit in zip(all_nav, all_units):
-                amount = nav * unit
-                amount_invested += amount
-
-            print(fund, amount_invested, "amount_invested")
-
-            fund_investment.avg_nav = amount_invested / len(all_units)
-            fund_investment.save()
-            fund_investments.append(fund_investment)
+            # for nav, unit in zip(all_nav, all_units):
+            #     amount = nav * unit
+            #     calculate_amount_invested += amount
+            #
+            # print(fund, calculate_amount_invested, "calculate_amount_invested")
+            #
+            # fund_investment.avg_nav = calculate_amount_invested / len(all_units)
+            # fund_investment.save()
+            # fund_investments.append(fund_investment)
 
             mf_book.investment_processed = True
             mf_book.save()
@@ -125,6 +127,7 @@ class MutualFundInvestment:
 
 
 class FundInvestmentFilter(FilterSet):
+    pass
     # symbol = django_filters.CharFilter(method="filter_by_security_symbol")
 
     # name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
@@ -134,19 +137,21 @@ class FundInvestmentFilter(FilterSet):
     #     symbols = value.split(",")
     #     return queryset.filter(security__symbol__in=symbols)
 
-    class Meta:
-        model = FundInvestment
-        fields = ("fund",)
+    # class Meta:
+    #     model = FundInvestment
+    #     fields = ("fund",)
 
 
 @extend_schema(tags=["Mutual Fund Investment App"], methods=["GET", ""])
 class FundInvestmentViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
-        return FundInvestmentSerializer
+        # return FundInvestmentSerializer
+        return None
 
     def get_queryset(self):
-        qs = FundInvestment.objects.filter(units__gt=0)
+        pass
+        # qs = FundInvestment.objects.filter(units__gt=0)
 
-        filter_qs = self.filter_queryset(qs)
+        # filter_qs = self.filter_queryset(qs)
 
-        return filter_qs
+        # return filter_qs

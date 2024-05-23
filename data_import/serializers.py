@@ -13,7 +13,9 @@ class TradeBookSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def get_total(self, trade_book):
-        return abs(float(trade_book.total))
+        if trade_book.total:
+            return abs(float(trade_book.total))
+        return float(trade_book.quantity) * float(trade_book.net_rate)
 
 
 class InvestmentBookSerializer(serializers.ModelSerializer):
