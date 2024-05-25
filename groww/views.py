@@ -1,4 +1,6 @@
 import json
+from _decimal import Decimal
+
 from convert_to_requests import curl_to_requests, to_python_code
 
 import requests
@@ -17,6 +19,7 @@ from groww.serializers import (
     SchemeTransactionSerializer,
 )
 from mutual_funds.models import Fund, FundInvestment
+from mutual_funds.utils import create_fund_securities
 
 # from mutual_funds.models import Fund
 # from mutual_funds.serializers import FundSerializer
@@ -94,23 +97,40 @@ class GrowwRequest:
 
 
 class GrowwInvestment:
-    def __init__(self):
-        pass
+    def __init__(self, user=None):
+        self._user = user
+        self._groww_request = GrowwRequest(user=self._user)
 
     def import_mutual_funds(self):
-        groww_request = GrowwRequest()
-
-        all_investments = groww_request.get_mf_investment()
-        holdings = all_investments.get("holdings")
-        for investment in all_investments:
-            pass
+        all_investments = self._groww_request.get_mf_investment()
+        investments = all_investments.get("holdings")
+        for investment in investments:
+            self.process_investment(investment=investment)
 
     def process_investment(self, investment):
-        fund = Fund.objects.filter(isin=investment["isin"])
-        if fund is None:
-            fund = Fund.create_from_dict(investment)
+        fund_details = self._groww_request.get_scheme_details(investment.get("searchId"))
 
-        fund_investment = FundInvestment
+        fund = self.create_or_update_fund(fund_details)
+
+        fund_investment, created = FundInvestment.objects.get_or_create(fund_id=fund.id, user=self._user)
+        units = Decimal(investment.get("units"))
+        # fund_investment.units_purchased.append(units)
+        # fund_investment.nav_purchased.append(investment.get("averageNav"))
+        # fund_investment.units += units
+        fund_investment.avg_nav = investment.get("averageNav")
+        fund_investment.units = units
+        fund_investment.save()
+
+    @staticmethod
+    def create_or_update_fund(fund_details):
+        fund = Fund.objects.filter(isin=fund_details["isin"]).last()
+        if fund is None:
+            fund = Fund.create_from_dict(fund_details)
+
+        holdings = fund_details.get("holdings")
+        create_fund_securities(fund=fund, securities=holdings)
+
+        return fund
 
 
 @extend_schema(tags=["GrowwRequest"])

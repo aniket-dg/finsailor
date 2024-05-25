@@ -12,3 +12,7 @@
 5 : separate details page for sector, industry, macro_sector
     - contains related news,
     - todays performance
+
+----------------------------------------------------------------------------
+6 : SIP details function is created, Save details data in Fund Model
+7 :

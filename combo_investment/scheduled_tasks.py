@@ -13,8 +13,8 @@ beat_schedules = {
         "schedule": crontab(minute=0, hour=17),  # every day at 5 PM
         "options": {"queue": settings.SCHEDULED_TASK_QUEUE},
     },
-    # "run_every_30_sec_": {
-    #     "task": "datahub.tasks.run_every_30_sec",
-    #     "schedule": crontab(minute="*"),
+    # "run_every_1_hour": {
+    #     "task": "datahub.tasks.update_all_securities_prices",
+    #     "schedule": crontab(minute=0),
     # },
 }

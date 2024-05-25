@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from combo_investment import settings
 from combo_investment.exception import APIBadRequest
-from datahub.models import SecurityCache
+from datahub.models import SecurityCache, Security
 from scrapper.serializers import SecuritySymbolSerializer
 
 
@@ -39,6 +39,22 @@ class NSECache:
         security_cache = SecurityCache.objects.filter(name=scrip_name).last()
         if security_cache:
             return security_cache.symbol
+
+        return None
+
+    @classmethod
+    def get_db_symbol(cls, scrip_name):
+        security_id_names = Security.objects.filter(security_info__tradingStatus="Active").values("id", "name", "symbol")
+
+        best_match = max(
+            (entry for entry in security_id_names if entry["name"] is not None),
+            key=lambda entry: difflib.SequenceMatcher(
+                None, scrip_name, entry["name"]
+            ).ratio(),
+        )
+        if best_match:
+            return best_match["symbol"]
+
         return None
 
     @classmethod
@@ -99,6 +115,7 @@ class NSEScrapper:
         )
 
     def get_symbol(self, scrip_name):
+        print("scrip_name")
         symbol = self.cache.get_symbol(scrip_name=scrip_name)
         if symbol:
             return symbol
@@ -124,17 +141,23 @@ class NSEScrapper:
         )
 
         symbol = symbol_name_to_symbol_data.get(max_match_symbol_info)
-
-        if len(symbol) > 1:
-            all_matching_symbols = [sym["symbol"] for sym in symbol]
-            max_matching_symbol = find_max_matching_string(
-                scrip_name, all_matching_symbols
-            )
-            symbol = max_matching_symbol
-        else:
-            symbol = symbol[0]["symbol"]
-
+        print(symbol)
         if symbol:
+            if len(symbol) > 1:
+                all_matching_symbols = [sym["symbol"] for sym in symbol]
+                max_matching_symbol = find_max_matching_string(
+                    scrip_name, all_matching_symbols
+                )
+                symbol = max_matching_symbol
+            else:
+                symbol = symbol[0]["symbol"]
+
+            self.cache.set_symbol(scrip_name=scrip_name, symbol=symbol)
+        else:
+            symbol = self.cache.get_db_symbol(scrip_name=scrip_name)
+            if symbol is None:
+                raise Exception("Symbol not found for scrip -  ", scrip_name)
+
             self.cache.set_symbol(scrip_name=scrip_name, symbol=symbol)
 
         return symbol if symbol else None
@@ -183,6 +206,7 @@ class NSEScrapper:
         data, status_code = self.load_url(url)
 
         return data, status_code
+
 
 
 @extend_schema(tags=["NSE Scrapper"])
