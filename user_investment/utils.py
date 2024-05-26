@@ -375,7 +375,7 @@ def get_security_percentage_change(investment):
 
 
 def calculate_todays_performance_by_macro_sector(securities):
-    security = Security.objects.last()
+    security = Security.objects.filter(symbol__in=["SJVN", "IRB", "SAIL", "PNB"]).last()
     macro_sectors = MacroSector.objects.all()
     macro_sector_name_to_securities = {}
 
@@ -394,6 +394,7 @@ def calculate_todays_performance_by_macro_sector(securities):
         todays_prices = []
 
         for security in macro_sector_securities:
+            logger.warning(security.id, security.symbol)
             yesterdays_data = security.historical_price_info.get(yesterday_date)
             yesterdays_price = (
                 yesterdays_data["close"]
