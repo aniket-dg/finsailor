@@ -3,14 +3,23 @@ from typing import List
 
 from datahub.models import Security
 from mutual_funds.models import FundSecurity, Fund
-from mutual_funds.views import MutualFund
+from scrapper.views import NSEScrapper
+from datahub.tasks import update_security_price
 
+def get_or_create_security(name):
+    nse = NSEScrapper()
+    symbol = nse.get_symbol(name)
+    security, created = Security.objects.get_or_create(
+        symbol=symbol, defaults={"name": name}
+    )
+    if created:
+        update_security_price.delay(security.id)
+    return security
 
 def create_fund_securities(fund: Fund, securities: List[dict]):
-    mutual_fund = MutualFund()
     fund.holdings.all().delete()
     for security in securities:
-        sec = mutual_fund.get_or_create_security(security["company_name"])
+        sec = get_or_create_security(security["company_name"])
         portfolio_date = datetime.datetime.strptime(security["portfolio_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
         fund_security = FundSecurity(
             security_id=sec.id,

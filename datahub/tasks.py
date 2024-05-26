@@ -7,7 +7,7 @@ from celery import shared_task
 from combo_investment import settings
 from combo_investment.celery import BaseTaskWithRetry
 from data_import.models import TradeBook
-from datahub.models import Security, StockIndex, TodayStockIndex
+from datahub.models import Security, StockIndex, TodayStockIndex, Holiday
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment
@@ -183,3 +183,21 @@ def update_index_stocks(index_id):
         historical_price_info[last_updated_time.date().isoformat()] = stock
         security.historical_price_info = historical_price_info
         security.save()
+
+
+@shared_task(base=BaseTaskWithRetry)
+def process_nse_holidays():
+    nse = NSEScrapper()
+    holidays = nse.get_holidays()
+
+    for key, holidays in holidays.items():
+        for holiday_data in holidays:
+            trading_date = datetime.datetime.strptime(holiday_data.get("tradingDate"), "%d-%b-%Y").date()
+            holiday = Holiday.objects.get_or_create(
+                trading_date=trading_date,
+                weekday=holiday_data.get("weekDay"),
+                description=holiday_data.get("description"),
+                sr_no=holiday_data.get("Sr_no")
+            )
+
+

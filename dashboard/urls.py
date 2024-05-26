@@ -19,10 +19,5 @@ urlpatterns = [
         "import/demat-report/",
         views.ImportDematReportData.as_view(),
         name="import-demat",
-    ),
-    path(
-        "import/mf-report/",
-        views.MutualFundReportData.as_view(),
-        name="import-mf",
-    ),
+    )
 ]

@@ -437,10 +437,6 @@ class InvestmentViewSet(viewsets.ModelViewSet):
     def get_sector_allocation(self, *args, **kwargs):
         broker = self.request.query_params.get("broker", None)
         qs = self.get_queryset()
-        # logger.warning("-------------------")
-        # logger.warning(qs)
-        # logger.warning(broker)
-        # logger.warning("-------------------")
 
         data = get_securities_by_sector(qs, show_zero_allocation_sectors=False)
         return Response(data=data, status=status.HTTP_200_OK)

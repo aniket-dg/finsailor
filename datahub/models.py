@@ -167,3 +167,13 @@ class TodayStockIndex(models.Model):
     )
     date_30_day_ago = models.DateField(null=True, blank=True)
     date_365_day_ago = models.DateField(null=True, blank=True)
+
+
+class Holiday(models.Model):
+    trading_date = models.DateField()
+    weekday = models.CharField(max_length=100)
+    description = models.CharField(max_length=500)
+    sr_no = models.IntegerField()
+
+    def __str__(self):
+        return f"Hoiliday - {self.trading_date}"

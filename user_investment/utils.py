@@ -9,6 +9,7 @@ from django.db.models.functions import Cast
 
 from combo_investment import settings
 from combo_investment.settings import TIME_ZONE
+from combo_investment.utils import is_market_close_today
 from datahub.models import Security, Parameter
 from datahub.serializers import (
     SecuritySerializer,
@@ -344,6 +345,9 @@ def get_security_percentage_change(investment):
     today = datetime.datetime.now().astimezone(local_tz)
     today_data = security.historical_price_info.get(today.date().isoformat())
 
+    if is_market_close_today():
+        today_data = None
+
     if today_data is None:
         last_date = sorted(security.historical_price_info.keys())[-1]
         today_data = security.historical_price_info.get(last_date)
@@ -371,12 +375,17 @@ def get_security_percentage_change(investment):
 
 
 def calculate_todays_performance_by_macro_sector(securities):
+    security = Security.objects.last()
     macro_sectors = MacroSector.objects.all()
     macro_sector_name_to_securities = {}
 
     local_tz = ZoneInfo(TIME_ZONE)
     today_date = datetime.datetime.now().astimezone(local_tz).date()
     yesterday_date = (today_date - timedelta(days=1)).isoformat()
+    if is_market_close_today():
+        sorted_data = sorted(security.historical_price_info.keys())
+        today_date = sorted_data[-1]
+        yesterday_date = sorted_data[-2]
     for macro_sector in macro_sectors:
         macro_sector_securities = securities.filter(
             basic_industry__industry__sector__macro_sector_id=macro_sector.id

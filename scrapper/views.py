@@ -1,6 +1,7 @@
 import datetime
 import difflib
 from collections import defaultdict
+from typing import Dict
 
 import requests
 from drf_spectacular.utils import extend_schema
@@ -206,6 +207,13 @@ class NSEScrapper:
         data, status_code = self.load_url(url)
 
         return data, status_code
+
+    def get_holidays(self) -> Dict:
+        url = settings.NSE_HOLIDAYS_LIST_API_URL
+
+        data, status_code = self.load_url(url)
+
+        return data
 
 
 

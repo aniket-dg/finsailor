@@ -222,6 +222,87 @@ class Fund(models.Model):
         )
 
 
+class FundTransaction(models.Model):
+    external = models.BooleanField()
+    remark = models.CharField(max_length=255)
+    user_account_id = models.CharField(max_length=50)
+    transaction_id = models.CharField(max_length=50)
+    scheme_code = models.CharField(max_length=20)
+    units = models.FloatField()
+    folio_number = models.CharField(max_length=50)
+    transaction_amount = models.DecimalField(decimal_places=5, max_digits=10, default=0)
+    transaction_price = models.DecimalField(decimal_places=5, max_digits=10, default=0)
+    transaction_type = models.CharField(max_length=50)
+    transaction_status = models.CharField(max_length=50)
+    transaction_time = models.DateTimeField()
+    transaction_date = models.DateField()
+    purchase_date = models.DateTimeField()
+    hidden = models.BooleanField()
+    transaction_source = models.CharField(max_length=50)
+    transaction_sub_type = models.CharField(max_length=50)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="fund_transactions",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        unique_together = (("user_account_id", "transaction_id"),)
+
+    @classmethod
+    def create_from_dict(cls, data):
+        transaction_time = datetime.strptime(
+            data.get("transaction_time"), "%Y-%m-%dT%H:%M:%S"
+        )
+        transaction_date = datetime.strptime(
+            data.get("transaction_date"), "%d %b %Y"
+        ).date()
+        purchase_date = datetime.strptime(
+            data.get("purchase_date"), "%Y-%m-%dT%H:%M:%S"
+        )
+
+        return cls.objects.create(
+            external=data.get("external", False),
+            remark=data.get("remark", ""),
+            user_account_id=data.get("user_account_id", ""),
+            transaction_id=data.get("transaction_id", ""),
+            scheme_code=data.get("scheme_code", ""),
+            units=data.get("units", 0.0),
+            folio_number=data.get("folio_number", ""),
+            transaction_amount=data.get("transaction_amount", 0.0),
+            transaction_price=data.get("transaction_price", 0.0),
+            transaction_type=transaction_time,
+            transaction_status=data.get("transaction_status", ""),
+            transaction_time=data.get("transaction_time"),
+            transaction_date=transaction_date,
+            purchase_date=purchase_date,
+            hidden=data.get("hidden", False),
+            transaction_source=data.get("transaction_source", ""),
+            transaction_sub_type=data.get("transaction_sub_type", ""),
+        )
+
+
+class SIPDetails(models.Model):
+    has_active_sip = models.BooleanField()
+    active_sip_count = models.IntegerField()
+
+
+class FundInvestmentFolio(models.Model):
+    folio_number = models.CharField(max_length=255)
+    units = models.FloatField()
+    amount_invested = models.FloatField()
+    average_nav = models.FloatField()
+    xirr = models.FloatField(null=True, blank=True)
+    portfolio_source = models.CharField(max_length=255)
+    folio_type = models.CharField(max_length=1)
+    first_unrealised_purchase_date = models.DateField(null=True, blank=True)
+    current_value = models.FloatField()
+    sip_details = models.OneToOneField(SIPDetails, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="fund_investment_folios")
+
+
 class FundInvestment(models.Model):
     fund = models.ForeignKey(
         Fund,
@@ -235,18 +316,15 @@ class FundInvestment(models.Model):
     )
     units = models.DecimalField(decimal_places=5, max_digits=10, default=0)
 
-    units_purchased = ArrayField(
-        models.DecimalField(decimal_places=5, max_digits=10, default=0), default=list
-    )
-    nav_purchased = ArrayField(
-        models.DecimalField(decimal_places=5, max_digits=10, default=0), default=list
-    )
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     amount_invested = models.DecimalField(decimal_places=5, max_digits=10, default=0)
-    folio_number = models.CharField(max_length=500, null=True, blank=True)
+    folios = models.ManyToManyField(FundInvestmentFolio, blank=True, related_name="fund_investments")
     isin = models.CharField(max_length=100, null=True, blank=True)
     current_value = models.DecimalField(decimal_places=5, max_digits=10, default=0)
     xirr = models.CharField(max_length=100, null=True, blank=True)
+    transactions = models.ManyToManyField(
+        FundTransaction, related_name="fund_investments"
+    )
 
     def __str__(self):
         return f""

@@ -1,3 +1,4 @@
+import datetime
 import json
 from _decimal import Decimal
 
@@ -18,7 +19,13 @@ from groww.serializers import (
     GrowwRequestGETSerializer,
     SchemeTransactionSerializer,
 )
-from mutual_funds.models import Fund, FundInvestment
+from mutual_funds.models import (
+    Fund,
+    FundInvestment,
+    FundTransaction,
+    FundInvestmentFolio,
+    SIPDetails,
+)
 from mutual_funds.utils import create_fund_securities
 
 # from mutual_funds.models import Fund
@@ -82,9 +89,14 @@ class GrowwRequest:
         url = settings.GROWW_SCHEME_TRANSACTIONS
         response = self._session.get(url, params=query_params)
         if response.status_code != 200:
-            raise Exception(response.text)
+            raise Exception((response.text, response.status_code))
 
-        return response.json()
+        response = response.json()
+        if response["response"] != "success":
+            raise Exception(
+                "Unable to fetch Scheme Transactions ->", folio_number, scheme_code
+            )
+        return response["data"]["transaction_list"]
 
     def get_scheme_details(self, search_id: str):
         url = settings.GROWW_MF_SCHEME_DETAILS + search_id
@@ -107,22 +119,115 @@ class GrowwInvestment:
         for investment in investments:
             self.process_investment(investment=investment)
 
-    def process_investment(self, investment):
-        fund_details = self._groww_request.get_scheme_details(investment.get("searchId"))
+    def process_investment(self, investment, partial_update=False):
+        fund_details = self._groww_request.get_scheme_details(
+            investment.get("searchId")
+        )
 
-        fund = self.create_or_update_fund(fund_details)
+        fund = self.create_or_update_fund(fund_details, partial_update=partial_update)
 
-        fund_investment, created = FundInvestment.objects.get_or_create(fund_id=fund.id, user=self._user)
+        fund_investment, created = FundInvestment.objects.get_or_create(
+            fund_id=fund.id, user=self._user
+        )
         units = Decimal(investment.get("units"))
-        # fund_investment.units_purchased.append(units)
-        # fund_investment.nav_purchased.append(investment.get("averageNav"))
-        # fund_investment.units += units
+        fund_investment.isin = investment.get("isin")
+        fund_investment.current_value = investment.get("currentValue")
+        fund_investment.xirr = investment.get("xirr")
+        fund_investment.avg_nav = investment.get("averageNav")
+        fund_investment.amount_invested = investment.get("amountInvested")
+        fund_investment.units = units
+        fund_investment.save()
+
+        self.process_investment_folios(
+            fund_investment=fund_investment, investment=investment
+        )
+
+    def process_investment_folios(self, fund_investment, investment):
+        if investment.get("hasMultipleFolio"):
+            folios = investment.get("folios")
+            for folio in folios:
+                folio_number = folio.get("folioNumber")
+                units = folio.get("units")
+                amount_invested = folio.get("amountInvested")
+                average_nav = float(folio.get("averageNav"))
+                current_value = folio.get("currentValue")
+                folio_type = folio.get("folioType")
+                xirr = folio.get("xirr")
+                portfolio_source = folio.get("portfolioSource")
+                first_unrealised_purchase_date = datetime.datetime.strptime(
+                    folio.get("firstUnrealisedPurchaseDate"), "%Y-%m-%dT%H:%M:%S"
+                ).date()
+                sip_data = folio.get("sipDetails")
+                sip_details = SIPDetails(
+                    has_active_sip=sip_data.get("hasActiveSip"),
+                    active_sip_count=sip_data.get("activeSipCount"),
+                )
+                sip_details.save()
+
+                fund_investment_folio = FundInvestmentFolio(
+                    folio_number=folio_number,
+                    units=units,
+                    amount_invested=amount_invested,
+                    average_nav=average_nav,
+                    current_value=current_value,
+                    xirr=xirr,
+                    portfolio_source=portfolio_source,
+                    folio_type=folio_type,
+                    first_unrealised_purchase_date=first_unrealised_purchase_date,
+                    sip_details=sip_details,
+                    user=self._user,
+                )
+
+                fund_investment_folio.save()
+                fund_investment.folios.add(fund_investment_folio)
+        else:
+            folio_number = investment.get("folioNumber")
+            units = investment.get("units")
+            amount_invested = investment.get("amountInvested")
+            average_nav = investment.get("averageNav")
+            current_value = investment.get("currentValue")
+            folio_type = investment.get("folioType")
+            xirr = investment.get("xirr")
+            portfolio_source = investment.get("source")
+            first_unrealised_purchase_date = None
+            sip_data = investment.get("sipDetails")
+            sip_details = SIPDetails(
+                has_active_sip=sip_data.get("hasActiveSip"),
+                active_sip_count=sip_data.get("activeSipCount"),
+            )
+            sip_details.save()
+
+            fund_investment_folio = FundInvestmentFolio(
+                folio_number=folio_number,
+                units=units,
+                amount_invested=amount_invested,
+                average_nav=average_nav,
+                current_value=current_value,
+                xirr=xirr,
+                portfolio_source=portfolio_source,
+                folio_type=folio_type,
+                first_unrealised_purchase_date=first_unrealised_purchase_date,
+                sip_details=sip_details,
+                user=self._user,
+            )
+
+            fund_investment_folio.save()
+            fund_investment.folios.add(fund_investment_folio)
+
+    def create_fund_investment(self, investment, fund):
+        fund_investment, created = FundInvestment.objects.get_or_create(
+            fund_id=fund.id, user=self._user
+        )
+        units = Decimal(investment.get("units"))
+        fund_investment.isin = investment.get("isin")
+        fund_investment.current_value = investment.get("currentValue")
+        fund_investment.xirr = investment.get("xirr")
         fund_investment.avg_nav = investment.get("averageNav")
         fund_investment.units = units
         fund_investment.save()
 
     @staticmethod
-    def create_or_update_fund(fund_details):
+    def create_or_update_fund(fund_details, partial_update=False):
         fund = Fund.objects.filter(isin=fund_details["isin"]).last()
         if fund is None:
             fund = Fund.create_from_dict(fund_details)
@@ -131,6 +236,28 @@ class GrowwInvestment:
         create_fund_securities(fund=fund, securities=holdings)
 
         return fund
+
+    def process_fund_transactions(self, fund_investment):
+        fund_investment_folios = fund_investment.folios.all()
+        for fund_investment_folio in fund_investment_folios:
+            transactions = self._groww_request.get_scheme_transactions(
+                folio_number=fund_investment_folio.folio_number,
+                scheme_code=fund_investment.fund.scheme_code,
+            )
+            fund_transactions = fund_investment.transactions.all()
+            for transaction in transactions:
+                db_transaction = fund_transactions.filter(
+                    user_id=self._user.id,
+                    transaction_id=transaction.get("transaction_id"),
+                    user_account_id=transaction.get("user_account_id"),
+                ).last()
+                if db_transaction is None:
+                    transaction["user_id"] = self._user.id
+                    db_transaction = FundTransaction.create_from_dict(transaction)
+                    db_transaction.user = self._user
+                    fund_investment.transactions.add(db_transaction)
+                    db_transaction.save()
+            fund_investment.save()
 
 
 @extend_schema(tags=["GrowwRequest"])
@@ -195,10 +322,12 @@ class GrowwRequestViewSet(viewsets.ViewSet):
         if not params.is_valid():
             raise Exception(params.errors)
         params_data = params.validated_data
-        result = groww.get_scheme_transactions(params_data.get("folio_number"),
-                                               params_data.get("scheme_code"),
-                                               params_data.get("page"),
-                                               params_data.get("size"))
+        result = groww.get_scheme_transactions(
+            params_data.get("folio_number"),
+            params_data.get("scheme_code"),
+            params_data.get("page"),
+            params_data.get("size"),
+        )
 
         return Response(result)
 
