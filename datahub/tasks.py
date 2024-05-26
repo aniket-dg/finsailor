@@ -1,4 +1,6 @@
 import datetime
+import math
+from collections import defaultdict
 from zoneinfo import ZoneInfo
 import logging
 
@@ -8,6 +10,7 @@ from combo_investment import settings
 from combo_investment.celery import BaseTaskWithRetry
 from data_import.models import TradeBook
 from datahub.models import Security, StockIndex, TodayStockIndex, Holiday
+from datahub.utils import get_all_securities
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment
@@ -156,7 +159,6 @@ def update_stock_indices_from_nse():
 
 @shared_task(base=BaseTaskWithRetry)
 def update_index_stocks(index_id):
-    print("index_id", "sldkfa;lfk;alk;dka;kd", index_id)
     stock_index = StockIndex.objects.get(id=index_id)
     nse = NSEScrapper()
     index_stocks, status = nse.get_index_stocks(index_symbol=stock_index.indexSymbol)
@@ -199,5 +201,27 @@ def process_nse_holidays():
                 description=holiday_data.get("description"),
                 sr_no=holiday_data.get("Sr_no")
             )
+
+
+def securities_stats():
+    res = defaultdict(list)
+    securities = get_all_securities()
+    for security in securities:
+        last_historical_price_data_key = sorted(security.historical_price_info.keys())[-1]
+        last_historical_price_data = security.historical_price_info[last_historical_price_data_key]
+        last_price = last_historical_price_data.get("lastPrice")
+        last_close = last_historical_price_data.get("previousClose")
+        if last_price is None or last_close is None:
+            print("Skip", security.id)
+            continue
+        if last_close != 0:
+            percent_change = ((last_price - last_close)/last_close)*100
+            res[math.floor(percent_change)].append({
+                "security_id": security.id,
+                "p_change": float(percent_change),
+                "change": last_price - last_close
+            })
+
+    return res
 
 

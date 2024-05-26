@@ -15,6 +15,7 @@ class FundSecurity(models.Model):
         related_name="fund_security",
         help_text="Reference to Security",
     )
+
     fund = models.ForeignKey(
         "Fund",
         on_delete=models.CASCADE,

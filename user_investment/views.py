@@ -190,7 +190,7 @@ class UserInvestment:
         historical_db_price_info = security.historical_price_info
 
         while from_date < today_date:
-            to_date = from_date + datetime.timedelta(days=365)
+            to_date = from_date + datetime.timedelta(days=360)
             print(from_date, "->", to_date)
             data, status = self.nse.get_historical_data_by_symbol(
                 security.symbol, from_date, to_date
