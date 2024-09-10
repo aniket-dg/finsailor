@@ -1,5 +1,6 @@
 from django.db import models
 
+from datahub.models import CustomJSONEncoder
 from users.models import User
 
 
@@ -25,4 +26,7 @@ class GrowwRequestHeader(models.Model):
     method = models.CharField(choices=HTTP_METHOD.choices, default=HTTP_METHOD.GET)
 
 
-
+class GrowwRequestError(models.Model):
+    url = models.URLField(null=True, blank=True)
+    data = models.JSONField(default=dict, encoder=CustomJSONEncoder)
+    datetime = models.DateTimeField(auto_now_add=True)

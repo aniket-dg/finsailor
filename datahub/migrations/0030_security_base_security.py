@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0029_alter_security_last_updated_price'),
+        ("datahub", "0029_alter_security_last_updated_price"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='security',
-            name='base_security',
+            model_name="security",
+            name="base_security",
             field=models.BooleanField(default=False),
         ),
     ]

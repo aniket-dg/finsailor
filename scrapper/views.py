@@ -45,7 +45,9 @@ class NSECache:
 
     @classmethod
     def get_db_symbol(cls, scrip_name):
-        security_id_names = Security.objects.filter(security_info__tradingStatus="Active").values("id", "name", "symbol")
+        security_id_names = Security.objects.filter(
+            security_info__tradingStatus="Active"
+        ).values("id", "name", "symbol")
 
         best_match = max(
             (entry for entry in security_id_names if entry["name"] is not None),
@@ -164,10 +166,29 @@ class NSEScrapper:
         return symbol if symbol else None
 
     def get_quote_by_symbol(self, symbol):
-        url = settings.NSE_SYMBOL_QUOTE_API_URL + symbol
+        url = settings.NSE_SYMBOL_QUOTE_API_URL
+        params = {
+            "symbol": symbol,
+        }
         print(f"Fetching Quote for security - {symbol}")
 
-        response, status_code = self.load_url(url)
+        response, status_code = self.load_url(url, params=params)
+        if status_code != 200:
+            return f"Unable to get given quote - {url} - {response}", status_code
+
+        quote = response
+
+        return quote, status_code
+
+    def get_trade_info_by_symbol(self, symbol):
+        url = settings.NSE_SYMBOL_QUOTE_API_URL
+        params = {
+            "symbol": symbol,
+            "section": "trade_info"
+        }
+        print(f"Fetching Trade Info for security - {symbol}")
+
+        response, status_code = self.load_url(url, params=params)
         if status_code != 200:
             return f"Unable to get given quote - {url} - {response}", status_code
 
@@ -194,6 +215,18 @@ class NSEScrapper:
 
         return data, status_code
 
+    def get_historical_stock_indices_data(self, index, from_date, to_date):
+        url = settings.NSE_STOCK_INDICES_HISTORICAL_DATA_API_URL
+        params = {
+            "indexType": index,
+            "from": from_date.date().strftime("%d-%m-%Y"),
+            "to": to_date.date().strftime("%d-%m-%Y"),
+        }
+
+        data, status_code = self.load_url(url, params=params)
+        return data.get("data"), status_code
+
+
     def get_index_stocks(self, index_symbol):
         url = settings.NSE_STOCK_INDEX_DETAIL_API_URL + index_symbol
 
@@ -214,7 +247,6 @@ class NSEScrapper:
         data, status_code = self.load_url(url)
 
         return data
-
 
 
 @extend_schema(tags=["NSE Scrapper"])

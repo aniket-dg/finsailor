@@ -4,7 +4,8 @@ from collections import defaultdict
 from zoneinfo import ZoneInfo
 import logging
 
-from celery import shared_task
+from celery import shared_task, chain
+from django.db import IntegrityError
 
 from combo_investment import settings
 from combo_investment.celery import BaseTaskWithRetry
@@ -15,6 +16,7 @@ from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment
 from user_investment.views import UserInvestment
+from industries.tasks import calculate_todays_performance
 
 logger = logging.getLogger("Datahub")
 
@@ -43,6 +45,11 @@ def update_security_price(security_id):
     quote, status_code = nse.get_quote_by_symbol(security.symbol)
     if status_code != 200:
         print("Error", quote)
+
+    if "error" in quote:
+        logger.warning(
+            f"Error occurred while updating security{security.id} - {security.symbol}, Error : {quote.get('message')}"
+        )
         return
 
     # Industry data
@@ -60,8 +67,9 @@ def update_security_price(security_id):
 
     # Info
     info = quote.get("info")
-    if not security.isin:
-        security.isin = info.get("isin")
+    metadata = quote.get("metadata")
+    # if not security.isin:
+    security.isin = metadata.get("isin")
     if not security.name:
         security.name = info.get("companyName")
 
@@ -103,10 +111,40 @@ def update_all_securities_prices():
 
 
 @shared_task(base=BaseTaskWithRetry)
-def update_historical_prices(security_id):
+def update_historical_prices(security_id, from_year, to_date):
     user_investment = UserInvestment()
-    user_investment.update_security_for_historical_prices(security_id)
+    user_investment.update_security_for_historical_prices(
+        security_id, from_year=from_year, to_date=to_date
+    )
     logger.info(f"Security {security_id} is updated for historical prices.")
+
+
+@shared_task(base=BaseTaskWithRetry)
+def update_trade_info_of_securities():
+    securities = Security.objects.filter(base_security=True)
+    nse = NSEScrapper()
+    for security in securities:
+        data, status = nse.get_trade_info_by_symbol(security.symbol)
+        market_dept_order_book = data.get("marketDeptOrderBook")
+        security_wise_dp = data.get("securityWiseDP")
+
+        if market_dept_order_book is None or security_wise_dp is None:
+            print(f"Trade Info not found for security {security.id}-{security.symbol}")
+            continue
+
+        date_str = security_wise_dp.get("secWiseDelPosDate")
+
+        try:
+            date_object = datetime.datetime.strptime(date_str, "%d-%b-%Y %H:%M:%S")
+        except ValueError as e:
+            date_object = datetime.datetime.now().astimezone(ZoneInfo(settings.TIME_ZONE))
+        trade_info = market_dept_order_book.get("tradeInfo")
+        security.market_cap = trade_info.get("totalMarketCap")
+        security.free_float_market_cap = trade_info.get("ffmc")
+        security.trade_info = {date_object.date().isoformat(): data}
+        security.save()
+
+
 
 
 @shared_task(
@@ -157,6 +195,29 @@ def update_stock_indices_from_nse():
     today_stock_index.stocks_indices.add(*today_stock_index_indices)
 
 
+def update_historical_data_of_stock_indices(from_date, to_date):
+    stock_indexes = StockIndex.objects.distinct("index")
+    nse = NSEScrapper()
+    local_tz = ZoneInfo(settings.TIME_ZONE)
+    for stock_index in stock_indexes:
+        data, status_code = nse.get_historical_stock_indices_data(stock_index.index, from_date, to_date)
+        for index_data in data.get("indexCloseOnlineRecords"):
+            new_index = stock_index.get_empty_object()
+            datetime_object = datetime.datetime.fromisoformat(index_data.get("TIMESTAMP").replace("Z", "+00:00"))
+            dt_local = datetime_object.astimezone(local_tz)
+            new_index.open = index_data.get("EOD_OPEN_INDEX_VAL")
+            new_index.high = index_data.get("EOD_HIGH_INDEX_VAL")
+            new_index.low = index_data.get("EOD_LOW_INDEX_VAL")
+            new_index.last = index_data.get("EOD_CLOSE_INDEX_VAL")
+            new_index.date = dt_local.date()
+            new_index.time = dt_local.time()
+            try:
+                new_index.save()
+            except IntegrityError as e:
+                pass
+
+
+
 @shared_task(base=BaseTaskWithRetry)
 def update_index_stocks(index_id):
     stock_index = StockIndex.objects.get(id=index_id)
@@ -194,12 +255,14 @@ def process_nse_holidays():
 
     for key, holidays in holidays.items():
         for holiday_data in holidays:
-            trading_date = datetime.datetime.strptime(holiday_data.get("tradingDate"), "%d-%b-%Y").date()
+            trading_date = datetime.datetime.strptime(
+                holiday_data.get("tradingDate"), "%d-%b-%Y"
+            ).date()
             holiday = Holiday.objects.get_or_create(
                 trading_date=trading_date,
                 weekday=holiday_data.get("weekDay"),
                 description=holiday_data.get("description"),
-                sr_no=holiday_data.get("Sr_no")
+                sr_no=holiday_data.get("Sr_no"),
             )
 
 
@@ -207,21 +270,46 @@ def securities_stats():
     res = defaultdict(list)
     securities = get_all_securities()
     for security in securities:
-        last_historical_price_data_key = sorted(security.historical_price_info.keys())[-1]
-        last_historical_price_data = security.historical_price_info[last_historical_price_data_key]
+        last_historical_price_data_key = sorted(security.historical_price_info.keys())[
+            -1
+        ]
+        last_historical_price_data = security.historical_price_info[
+            last_historical_price_data_key
+        ]
         last_price = last_historical_price_data.get("lastPrice")
         last_close = last_historical_price_data.get("previousClose")
         if last_price is None or last_close is None:
             print("Skip", security.id)
             continue
         if last_close != 0:
-            percent_change = ((last_price - last_close)/last_close)*100
-            res[math.floor(percent_change)].append({
-                "security_id": security.id,
-                "p_change": float(percent_change),
-                "change": last_price - last_close
-            })
+            percent_change = ((last_price - last_close) / last_close) * 100
+            res[math.floor(percent_change)].append(
+                {
+                    "security_id": security.id,
+                    "p_change": float(percent_change),
+                    "change": last_price - last_close,
+                }
+            )
 
     return res
 
 
+@shared_task
+def calculate_security_prices_sector_performance():
+    # signature = chain(update_all_securities_prices.s(), calculate_todays_performance.s())
+    # signature()
+    #
+    # callback_signature = update_all_securities_prices.signature(
+    #     immutable=True,
+    #     link=calculate_todays_performance.signature(immutable=True),
+    #     link_error=calculate_todays_performance.signature(immutable=True),
+    # )
+    # #
+    # callback_signature()
+
+    callback = calculate_todays_performance.signature(immutable=True)
+
+    update_all_securities_prices.apply_async(
+        link=callback,
+        link_error=callback,
+    )

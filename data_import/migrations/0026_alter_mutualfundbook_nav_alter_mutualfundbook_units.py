@@ -6,18 +6,21 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('data_import', '0025_alter_mutualfundbook_amount_alter_mutualfundbook_nav_and_more'),
+        (
+            "data_import",
+            "0025_alter_mutualfundbook_amount_alter_mutualfundbook_nav_and_more",
+        ),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='nav',
+            model_name="mutualfundbook",
+            name="nav",
             field=models.FloatField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='units',
+            model_name="mutualfundbook",
+            name="units",
             field=models.FloatField(blank=True, null=True),
         ),
     ]

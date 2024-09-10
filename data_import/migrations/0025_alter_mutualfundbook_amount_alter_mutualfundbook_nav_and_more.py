@@ -6,23 +6,32 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('data_import', '0024_alter_mutualfundbook_amount_alter_mutualfundbook_nav_and_more'),
+        (
+            "data_import",
+            "0024_alter_mutualfundbook_amount_alter_mutualfundbook_nav_and_more",
+        ),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='amount',
-            field=models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True),
+            model_name="mutualfundbook",
+            name="amount",
+            field=models.DecimalField(
+                blank=True, decimal_places=5, max_digits=10, null=True
+            ),
         ),
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='nav',
-            field=models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True),
+            model_name="mutualfundbook",
+            name="nav",
+            field=models.DecimalField(
+                blank=True, decimal_places=5, max_digits=10, null=True
+            ),
         ),
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='units',
-            field=models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True),
+            model_name="mutualfundbook",
+            name="units",
+            field=models.DecimalField(
+                blank=True, decimal_places=5, max_digits=10, null=True
+            ),
         ),
     ]

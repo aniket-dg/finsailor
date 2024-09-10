@@ -7,18 +7,22 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('user_investment', '0005_remove_investment_buying_prices_and_more'),
+        ("user_investment", "0005_remove_investment_buying_prices_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='investment',
-            name='buying_prices',
-            field=django.contrib.postgres.fields.ArrayField(base_field=models.JSONField(default={}), default=list, size=None),
+            model_name="investment",
+            name="buying_prices",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.JSONField(default={}), default=list, size=None
+            ),
         ),
         migrations.AddField(
-            model_name='investment',
-            name='selling_prices',
-            field=django.contrib.postgres.fields.ArrayField(base_field=models.JSONField(default={}), default=list, size=None),
+            model_name="investment",
+            name="selling_prices",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.JSONField(default={}), default=list, size=None
+            ),
         ),
     ]

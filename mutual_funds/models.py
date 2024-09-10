@@ -35,34 +35,37 @@ class FundSecurity(models.Model):
 
 
 class Fund(models.Model):
-    meta_title = models.CharField(max_length=500)
-    meta_desc = models.TextField()
-    meta_robots = models.CharField(max_length=500)
-    amc = models.CharField(max_length=500)
-    scheme_code = models.CharField(max_length=500)
+    meta_title = models.CharField(max_length=500, null=True, blank=True)
+    meta_desc = models.TextField(null=True, blank=True)
+    meta_robots = models.CharField(max_length=500, null=True, blank=True)
+    amc = models.CharField(max_length=500, null=True, blank=True)
+    scheme_code = models.CharField(max_length=500, null=True, blank=True)
     direct_scheme_code = models.CharField(max_length=500, null=True, blank=True)
     regular_search_id = models.CharField(max_length=500, null=True, blank=True)
-    scheme_name = models.CharField(max_length=500)
-    registrar_agent = models.CharField(max_length=500)
-    search_id = models.CharField(max_length=500)
+    scheme_name = models.CharField(max_length=500, null=True, blank=True)
+    registrar_agent = models.CharField(max_length=500, null=True, blank=True)
+    search_id = models.CharField(max_length=500, null=True, blank=True)
     min_investment_amount = models.PositiveIntegerField()
-    fund_house = models.CharField(max_length=500)
-    fund_manager = models.CharField(max_length=500)
+    fund_house = models.CharField(max_length=500, null=True, blank=True)
+    fund_manager = models.CharField(max_length=500, null=True, blank=True)
     launch_date = models.DateField()
     mini_additional_investment = models.PositiveIntegerField()
     sip_multiplier = models.PositiveIntegerField()
     groww_rating = models.FloatField(null=True, blank=True)
     crisil_rating = models.FloatField(null=True, blank=True)
-    category = models.CharField(max_length=500)
-    rta_scheme_code = models.CharField(max_length=500)
-    exit_load = models.CharField(max_length=500)
-    sub_category = models.CharField(max_length=500)
-    description = models.TextField()
-    benchmark = models.CharField(max_length=500)
-    benchmark_name = models.CharField(max_length=500)
+    category = models.CharField(max_length=500, null=True, blank=True)
+    rta_scheme_code = models.CharField(max_length=500, null=True, blank=True)
+    exit_load = models.CharField(max_length=500, null=True, blank=True)
+    one_year_returns = models.CharField(max_length=500, null=True, blank=True)
+    three_year_returns = models.CharField(max_length=500, null=True, blank=True)
+    five_year_returns = models.CharField(max_length=500, null=True, blank=True)
+    sub_category = models.CharField(max_length=500, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    benchmark = models.CharField(max_length=500, null=True, blank=True)
+    benchmark_name = models.CharField(max_length=500, null=True, blank=True)
     aum = models.FloatField()
-    expense_ratio = models.CharField(max_length=500)
-    super_category = models.CharField(max_length=500)
+    expense_ratio = models.CharField(max_length=500, null=True, blank=True)
+    super_category = models.CharField(max_length=500, null=True, blank=True)
     sub_sub_category = models.CharField(max_length=500, null=True, blank=True)
     min_sip_investment = models.PositiveIntegerField()
     max_sip_investment = models.PositiveIntegerField()
@@ -74,22 +77,22 @@ class Fund(models.Model):
     doc_required = models.BooleanField()
     nav = models.FloatField()
     nav_date = models.DateField(null=True, blank=True)
-    plan_type = models.CharField(max_length=500)
-    scheme_type = models.CharField(max_length=500)
+    plan_type = models.CharField(max_length=500, null=True, blank=True)
+    scheme_type = models.CharField(max_length=500, null=True, blank=True)
     video_url = models.URLField(null=True, blank=True)
     fund_news = models.TextField(null=True, blank=True)
     fund_events = models.TextField(null=True, blank=True)
     logo_url = models.URLField()
     sid_url = models.URLField()
     amc_page_url = models.URLField()
-    isin = models.CharField(max_length=500)
-    groww_scheme_code = models.CharField(max_length=500)
-    stamp_duty = models.CharField(max_length=500)
+    isin = models.CharField(max_length=500, null=True, blank=True)
+    groww_scheme_code = models.CharField(max_length=500, null=True, blank=True)
+    stamp_duty = models.CharField(max_length=500, null=True, blank=True)
     dividend = models.CharField(max_length=500, null=True, blank=True)
     closed_scheme = models.BooleanField()
     closed_date = models.DateField(null=True, blank=True)
     additional_details = models.TextField(null=True, blank=True)
-    prod_code = models.CharField(max_length=500)
+    prod_code = models.CharField(max_length=500, null=True, blank=True)
     stp_flag = models.BooleanField()
     swp_flag = models.BooleanField()
     switch_flag = models.BooleanField()
@@ -128,99 +131,120 @@ class Fund(models.Model):
         blank=True,
     )
 
+    last_updated = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
         return self.scheme_name
 
     @classmethod
-    def create_from_dict(cls, data):
-        return cls.objects.create(
-            meta_title=data.get("meta_title", ""),
-            meta_desc=data.get("meta_desc", ""),
-            meta_robots=data.get("meta_robots", ""),
-            amc=data.get("amc", ""),
-            scheme_code=data.get("scheme_code", ""),
-            direct_scheme_code=data.get("direct_scheme_code"),
-            regular_search_id=data.get("regular_search_id"),
-            scheme_name=data.get("scheme_name", ""),
-            registrar_agent=data.get("registrar_agent", ""),
-            search_id=data.get("search_id", ""),
-            min_investment_amount=data.get("min_investment_amount", 0),
-            fund_house=data.get("fund_house", ""),
-            fund_manager=data.get("fund_manager", ""),
-            launch_date=(
-                datetime.strptime(data.get("nav_date"), "%d-%B-%Y")
+    def create_or_update_from_dict(cls, data):
+        # Identify the unique field (in this case, scheme_code)
+        scheme_code = data.get("scheme_code", "")
+
+        # Define all possible fields with default values
+        all_defaults = {
+            "meta_title": data.get("meta_title", ""),
+            "meta_desc": data.get("meta_desc", ""),
+            "meta_robots": data.get("meta_robots", ""),
+            "amc": data.get("amc", ""),
+            "direct_scheme_code": data.get("direct_scheme_code"),
+            "regular_search_id": data.get("regular_search_id"),
+            "scheme_name": data.get("scheme_name", ""),
+            "registrar_agent": data.get("registrar_agent", ""),
+            "search_id": data.get("search_id", ""),
+            "one_year_return": data.get("return1y", ""),
+            "three_year_return": data.get("return3y", ""),
+            "five_year_return": data.get("return5y", ""),
+            "min_investment_amount": data.get("min_investment_amount", 0),
+            "fund_house": data.get("fund_house", ""),
+            "fund_manager": data.get("fund_manager", ""),
+            "launch_date": (
+                datetime.strptime(data.get("launch_date"), "%d-%b-%Y")
+                if data.get("launch_date")
+                else None
+            ),
+            "mini_additional_investment": data.get("mini_additional_investment", 0),
+            "sip_multiplier": data.get("sip_multiplier", 1),
+            "groww_rating": data.get("groww_rating"),
+            "crisil_rating": data.get("crisil_rating"),
+            "category": data.get("category", ""),
+            "rta_scheme_code": data.get("rta_scheme_code", ""),
+            "exit_load": data.get("exit_load", ""),
+            "sub_category": data.get("sub_category", ""),
+            "description": data.get("description", ""),
+            "benchmark": data.get("benchmark", ""),
+            "benchmark_name": data.get("benchmark_name", ""),
+            "aum": data.get("aum", 0.0),
+            "expense_ratio": data.get("expense_ratio", "0.0"),
+            "super_category": data.get("super_category", ""),
+            "sub_sub_category": data.get("sub_sub_category"),
+            "min_sip_investment": data.get("min_sip_investment", 0),
+            "max_sip_investment": data.get("max_sip_investment", 0),
+            "min_withdrawal": data.get("min_withdrawal", 0),
+            "purchase_multiplier": data.get("purchase_multiplier", 1),
+            "available_for_investment": data.get("available_for_investment", False),
+            "sip_allowed": data.get("sip_allowed", False),
+            "lumpsum_allowed": data.get("lumpsum_allowed", False),
+            "doc_required": data.get("doc_required", False),
+            "nav": data.get("nav", 0.0),
+            "nav_date": (
+                datetime.strptime(data.get("nav_date"), "%d-%b-%Y")
                 if data.get("nav_date")
                 else None
             ),
-            mini_additional_investment=data.get("mini_additional_investment", 0),
-            sip_multiplier=data.get("sip_multiplier", 1),
-            groww_rating=data.get("groww_rating"),
-            crisil_rating=data.get("crisil_rating"),
-            category=data.get("category", ""),
-            rta_scheme_code=data.get("rta_scheme_code", ""),
-            exit_load=data.get("exit_load", ""),
-            sub_category=data.get("sub_category", ""),
-            description=data.get("description", ""),
-            benchmark=data.get("benchmark", ""),
-            benchmark_name=data.get("benchmark_name", ""),
-            aum=data.get("aum", 0.0),
-            expense_ratio=data.get("expense_ratio", "0.0"),
-            super_category=data.get("super_category", ""),
-            sub_sub_category=data.get("sub_sub_category"),
-            min_sip_investment=data.get("min_sip_investment", 0),
-            max_sip_investment=data.get("max_sip_investment", 0),
-            min_withdrawal=data.get("min_withdrawal", 0),
-            purchase_multiplier=data.get("purchase_multiplier", 1),
-            available_for_investment=data.get("available_for_investment", False),
-            sip_allowed=data.get("sip_allowed", False),
-            lumpsum_allowed=data.get("lumpsum_allowed", False),
-            doc_required=data.get("doc_required", False),
-            nav=data.get("nav", 0.0),
-            nav_date=(
-                datetime.strptime(data.get("nav_date"), "%d-%B-%Y")
-                if data.get("nav_date")
-                else None
-            ),
-            plan_type=data.get("plan_type", ""),
-            scheme_type=data.get("scheme_type", ""),
-            video_url=data.get("video_url"),
-            fund_news=data.get("fund_news"),
-            fund_events=data.get("fund_events"),
-            logo_url=data.get("logo_url", ""),
-            sid_url=data.get("sid_url", ""),
-            amc_page_url=data.get("amc_page_url", ""),
-            isin=data.get("isin", ""),
-            groww_scheme_code=data.get("groww_scheme_code", ""),
-            stamp_duty=data.get("stamp_duty", ""),
-            dividend=data.get("dividend"),
-            closed_scheme=data.get("closed_scheme", False),
-            closed_date=data.get("closed_date"),
-            additional_details=data.get("additional_details"),
-            prod_code=data.get("prod_code", ""),
-            stp_flag=data.get("stp_flag", False),
-            swp_flag=data.get("swp_flag", False),
-            switch_flag=data.get("switch_flag", False),
-            redemption_amount_multiple=data.get("redemption_amount_multiple"),
-            redemption_qty_multiplier=data.get("redemption_qty_multiplier"),
-            unique_groww_scheme_code=data.get("unique_groww_scheme_code"),
-            swp_frequencies=data.get("swp_frequencies"),
-            blocked_reason=data.get("blocked_reason"),
-            is_additional_check_req=data.get("is_additional_check_req", False),
-            sip_return=data.get("sip_return"),
-            simple_return=data.get("simple_return"),
-            lock_in=data.get("lock_in"),
-            historic_exit_loads=data.get("historic_exit_loads"),
-            historic_fund_expense=data.get("historic_fund_expense"),
-            stpDetails=data.get("stpDetails"),
-            swpDetails=data.get("swpDetails"),
-            analysis=data.get("analysis"),
-            amc_info=data.get("amc_info"),
-            category_info=data.get("category_info"),
-            stats=data.get("stats"),
-            return_stats=data.get("return_stats"),
-            fund_manager_details=data.get("fund_manager_details"),
-            rta_details=data.get("rta_details"),
+            "plan_type": data.get("plan_type", ""),
+            "scheme_type": data.get("scheme_type", ""),
+            "video_url": data.get("video_url"),
+            "fund_news": data.get("fund_news"),
+            "fund_events": data.get("fund_events"),
+            "logo_url": data.get("logo_url", ""),
+            "sid_url": data.get("sid_url", ""),
+            "amc_page_url": data.get("amc_page_url", ""),
+            "isin": data.get("isin", ""),
+            "groww_scheme_code": data.get("groww_scheme_code", ""),
+            "stamp_duty": data.get("stamp_duty", ""),
+            "dividend": data.get("dividend"),
+            "closed_scheme": data.get("closed_scheme", False),
+            "closed_date": data.get("closed_date"),
+            "additional_details": data.get("additional_details"),
+            "prod_code": data.get("prod_code", ""),
+            "stp_flag": data.get("stp_flag", False),
+            "swp_flag": data.get("swp_flag", False),
+            "switch_flag": data.get("switch_flag", False),
+            "redemption_amount_multiple": data.get("redemption_amount_multiple"),
+            "redemption_qty_multiplier": data.get("redemption_qty_multiplier"),
+            "unique_groww_scheme_code": data.get("unique_groww_scheme_code"),
+            "swp_frequencies": data.get("swp_frequencies"),
+            "blocked_reason": data.get("blocked_reason"),
+            "is_additional_check_req": data.get("is_additional_check_req", False),
+            "sip_return": data.get("sip_return"),
+            "simple_return": data.get("simple_return"),
+            "lock_in": data.get("lock_in"),
+            "historic_exit_loads": data.get("historic_exit_loads"),
+            "historic_fund_expense": data.get("historic_fund_expense"),
+            "stpDetails": data.get("stpDetails"),
+            "swpDetails": data.get("swpDetails"),
+            "analysis": data.get("analysis"),
+            "amc_info": data.get("amc_info"),
+            "category_info": data.get("category_info"),
+            "stats": data.get("stats"),
+            "return_stats": data.get("return_stats"),
+            "fund_manager_details": data.get("fund_manager_details"),
+            "rta_details": data.get("rta_details"),
+        }
+
+        # Filter the defaults to only include those present in data
+        defaults = {key: value for key, value in all_defaults.items() if key in data}
+
+        print()
+        print(defaults)
+        print()
+
+        fund, created = cls.objects.update_or_create(
+            scheme_code=scheme_code, defaults=defaults
         )
+
+        return fund
 
 
 class FundTransaction(models.Model):
@@ -291,7 +315,7 @@ class SIPDetails(models.Model):
 
 
 class FundInvestmentFolio(models.Model):
-    folio_number = models.CharField(max_length=255)
+    folio_number = models.CharField(max_length=255, unique=True)
     units = models.FloatField()
     amount_invested = models.FloatField()
     average_nav = models.FloatField()
@@ -301,7 +325,13 @@ class FundInvestmentFolio(models.Model):
     first_unrealised_purchase_date = models.DateField(null=True, blank=True)
     current_value = models.FloatField()
     sip_details = models.OneToOneField(SIPDetails, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="fund_investment_folios")
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="fund_investment_folios",
+    )
 
 
 class FundInvestment(models.Model):
@@ -319,7 +349,9 @@ class FundInvestment(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     amount_invested = models.DecimalField(decimal_places=5, max_digits=10, default=0)
-    folios = models.ManyToManyField(FundInvestmentFolio, blank=True, related_name="fund_investments")
+    folios = models.ManyToManyField(
+        FundInvestmentFolio, blank=True, related_name="fund_investments"
+    )
     isin = models.CharField(max_length=100, null=True, blank=True)
     current_value = models.DecimalField(decimal_places=5, max_digits=10, default=0)
     xirr = models.CharField(max_length=100, null=True, blank=True)

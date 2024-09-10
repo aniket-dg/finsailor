@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('groww', '0002_alter_growwrequest_headers'),
+        ("groww", "0002_alter_growwrequest_headers"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='growwrequest',
-            name='headers',
+            model_name="growwrequest",
+            name="headers",
             field=models.JSONField(),
         ),
     ]

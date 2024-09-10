@@ -8,18 +8,35 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Fund',
+            name="Fund",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('scheme_name', models.CharField(max_length=100)),
-                ('nav', models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)),
-                ('nav_date', models.DateField(blank=True, null=True)),
-                ('additional_data', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("scheme_name", models.CharField(max_length=100)),
+                (
+                    "nav",
+                    models.DecimalField(
+                        blank=True, decimal_places=5, max_digits=10, null=True
+                    ),
+                ),
+                ("nav_date", models.DateField(blank=True, null=True)),
+                (
+                    "additional_data",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
             ],
         ),
     ]

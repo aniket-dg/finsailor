@@ -6,53 +6,53 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mutual_funds', '0004_alter_fund_amc_alter_fund_benchmark_and_more'),
+        ("mutual_funds", "0004_alter_fund_amc_alter_fund_benchmark_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='fund',
-            name='category',
+            model_name="fund",
+            name="category",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='meta_robots',
+            model_name="fund",
+            name="meta_robots",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='plan_type',
+            model_name="fund",
+            name="plan_type",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='registrar_agent',
+            model_name="fund",
+            name="registrar_agent",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='regular_search_id',
+            model_name="fund",
+            name="regular_search_id",
             field=models.CharField(blank=True, max_length=500, null=True),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='scheme_type',
+            model_name="fund",
+            name="scheme_type",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='search_id',
+            model_name="fund",
+            name="search_id",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='stamp_duty',
+            model_name="fund",
+            name="stamp_duty",
             field=models.CharField(max_length=500),
         ),
         migrations.AlterField(
-            model_name='fund',
-            name='sub_category',
+            model_name="fund",
+            name="sub_category",
             field=models.CharField(max_length=500),
         ),
     ]

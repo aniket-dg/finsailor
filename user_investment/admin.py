@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from datahub.models import Security
-from user_investment.models import Investment
+from user_investment.models import Investment, SectorWisePortfolio
 from django.contrib.admin import SimpleListFilter
 
 
@@ -28,12 +28,16 @@ class InvestmentAdmin(admin.ModelAdmin):
         "broker",
         "avg_price",
         "quantity",
+        "user",
         "get_basic_industry",
     ]
 
-    list_filter = ["broker", SecurityFilter]
+    list_filter = ["broker", SecurityFilter, "user"]
 
     def get_basic_industry(self, obj):
         return obj.security.basic_industry
 
     get_basic_industry.short_description = "Basic Industry"
+
+
+admin.site.register(SectorWisePortfolio)

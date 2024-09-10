@@ -2,7 +2,6 @@ from drf_yasg.inspectors import SwaggerAutoSchema
 
 
 class CustomAutoSchema(SwaggerAutoSchema):
-
     def get_tags(self, operation_keys=None):
         """Get a list of tags for this operation. Tags determine how operations relate with each other, and in the UI
         each tag will show as a group containing the operations that use it. If not provided in overrides,

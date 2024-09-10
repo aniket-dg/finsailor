@@ -7,13 +7,13 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('groww', '0003_alter_growwrequest_headers'),
+        ("groww", "0003_alter_growwrequest_headers"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='GrowwRequest',
-            new_name='GrowwRequestHeader',
+            old_name="GrowwRequest",
+            new_name="GrowwRequestHeader",
         ),
     ]

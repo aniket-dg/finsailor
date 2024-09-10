@@ -15,6 +15,12 @@ class FundSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class FundListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Fund
+        fields = ["id", "scheme_name", "description"]
+
+
 class FundTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FundTransaction
@@ -34,7 +40,7 @@ class FundInvestmentFolioSerializer(serializers.ModelSerializer):
 
 
 class FundInvestmentSerializer(serializers.ModelSerializer):
-    fund = FundSerializer()
+    fund = FundListSerializer()
     folios = FundInvestmentFolioSerializer(many=True)
     transactions = FundTransactionSerializer(many=True)
 

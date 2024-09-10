@@ -6,13 +6,21 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('groww', '0004_rename_growwrequest_growwrequestheader'),
+        ("groww", "0004_rename_growwrequest_growwrequestheader"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='growwrequestheader',
-            name='method',
-            field=models.CharField(choices=[('get', 'GET'), ('post', 'POST'), ('patch', 'PATCH'), ('put', 'PUT')], default='get'),
+            model_name="growwrequestheader",
+            name="method",
+            field=models.CharField(
+                choices=[
+                    ("get", "GET"),
+                    ("post", "POST"),
+                    ("patch", "PATCH"),
+                    ("put", "PUT"),
+                ],
+                default="get",
+            ),
         ),
     ]

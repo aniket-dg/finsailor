@@ -6,14 +6,16 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0033_rename_chart30d_path_stockindex_chart30dpath_and_more'),
-        ('news', '0001_initial'),
+        ("datahub", "0033_rename_chart30d_path_stockindex_chart30dpath_and_more"),
+        ("news", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='security',
-            name='event',
-            field=models.ManyToManyField(blank=True, related_name='security', to='news.stockevent'),
+            model_name="security",
+            name="event",
+            field=models.ManyToManyField(
+                blank=True, related_name="security", to="news.stockevent"
+            ),
         ),
     ]

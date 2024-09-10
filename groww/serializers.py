@@ -8,8 +8,10 @@ class GrowwRequestSerializer(serializers.ModelSerializer):
         model = GrowwRequestHeader
         fields = "__all__"
 
+
 class GrowwRequestGETSerializer(serializers.ModelSerializer):
     headers = serializers.CharField()
+
     class Meta:
         model = GrowwRequestHeader
         fields = "__all__"

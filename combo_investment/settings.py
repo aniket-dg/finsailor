@@ -28,6 +28,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+INTERNAL_IPS = [
+    # ...
+    "127.0.0.1",
+    "0.0.0.0",
+    # ...
+]
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -37,7 +45,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework.authtoken",
     "corsheaders",
+    "debug_toolbar",
     "drf_yasg",
     "drf_spectacular",
     "django_filters",
@@ -52,9 +62,11 @@ INSTALLED_APPS = [
     "news",
     "mutual_funds",
     "groww",
+    "research",
 ]
 
 MIDDLEWARE = [
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -171,6 +183,8 @@ AUTH_USER_MODEL = "users.User"
 #     },
 # }
 
+NOTEBOOK_ARGUMENTS = ["--ip", "0.0.0.0", "--port", "8888"]
+
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
@@ -180,6 +194,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "COMPONENT_SPLIT_REQUEST": True,
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.BasicAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+        "combo_investment.authentication.CustomTokenAuthentication",
+    ],
 }
 
 SWAGGER_SETTINGS = {
@@ -231,8 +250,11 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 NSE_BASE_URL = "https://www.nseindia.com"
 NSE_HISTORICAL_DATA_API_URL = "https://www.nseindia.com/api/historical/cm/equity"
 NSE_SEARCH_SYMBOL_API_URL = "https://www.nseindia.com/api/search/autocomplete?q="
-NSE_SYMBOL_QUOTE_API_URL = "https://www.nseindia.com/api/quote-equity?symbol="
+NSE_SYMBOL_QUOTE_API_URL = "https://www.nseindia.com/api/quote-equity"
 NSE_STOCK_INDICES_API_URl = "https://www.nseindia.com/api/allIndices"
+NSE_STOCK_INDICES_HISTORICAL_DATA_API_URL = (
+    "https://www.nseindia.com/api/historical/indicesHistory"
+)
 NSE_STOCK_INDEX_DETAIL_API_URL = (
     "https://www.nseindia.com/api/equity-stockIndices?index="
 )
@@ -241,8 +263,18 @@ NSE_HOLIDAYS_LIST_API_URL = "https://www.nseindia.com/api/holiday-master?type=tr
 
 
 GROWW_MF_INVESTMENT_DASHBOARD = "https://groww.in/v1/api/aggregator/v2/dashboard"
+GROWW_MF_LIST = "https://groww.in/v1/api/search/v1/derived/scheme"
+GROWW_STOCK_INVESTMENT_DASHBOARD = "https://groww.in/v1/api/stocks_router/v6/dashboard"
+GROWW_STOCK_INVESTMENT_TRANSACTIONS = (
+    "https://groww.in/v1/api/stocks_portfolio/v2/holding/symbol_isin/{}/txns/unrealized"
+)
 # GROWW_MF_SCHEME_DETAILS = "https://groww.in/v1/api/bse/v1/scheme/details"
 GROWW_SCHEME_TRANSACTIONS = (
     "https://groww.in/v1/api/portfolio/v1/transaction/scheme/all"
 )
-GROWW_MF_SCHEME_DETAILS = "https://groww.in/v1/api/data/mf/web/v3/scheme/search/"
+GROWW_MF_SCHEME_DETAILS = "https://groww.in/v1/api/data/mf/web/v4/scheme/search/"
+
+
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: True,  # Always show toolbar
+}

@@ -1,18 +1,21 @@
 import datetime
 
+from django.http import JsonResponse
 from django.shortcuts import render
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from datahub.models import Security
-from industries.models import BasicIndustry
+from datahub.models import Security, TodaysMacroSectorPerformance
+from industries.models import BasicIndustry  # , TodaysMacroSectorPerformance
 from industries.serializers import MacroSectorSerializer
 from user_investment.utils import calculate_todays_performance_by_macro_sector
 
 
 def get_basic_industry_object_from_industry_info(industry_info):
+    if industry_info is None:
+        return None
     macro = industry_info.get("macro")
     sector = industry_info.get("sector")
     industry = industry_info.get("industry")
@@ -80,9 +83,11 @@ class MacroSectorViewSet(viewsets.ModelViewSet):
         url_name="sector_performance",
     )
     def get_sector_performance(self, *args, **kwargs):
-        securities = Security.objects.filter(security_info__tradingStatus="Active")
-        sector_performance = calculate_todays_performance_by_macro_sector(
-            securities=securities
-        )
-        # sector_performance["date"] = datetime.datetime.now()
-        return Response(sector_performance, status=status.HTTP_200_OK)
+        sector_performance_obj = TodaysMacroSectorPerformance.objects.order_by(
+            "datetime"
+        ).last()
+        # securities = Security.select_related.filter(security_info__tradingStatus="Active")
+        # sector_performance = calculate_todays_performance_by_macro_sector(
+        #     securities=securities
+        # )
+        return Response(sector_performance_obj.data, status=status.HTTP_200_OK)

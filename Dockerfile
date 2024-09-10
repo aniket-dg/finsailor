@@ -23,4 +23,5 @@ RUN python -m venv ${VIRTUAL_ENV}
 ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install black~=22.3.0
 

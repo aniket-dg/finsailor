@@ -6,23 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('data_import', '0023_remove_mutualfundbook_processed'),
+        ("data_import", "0023_remove_mutualfundbook_processed"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='amount',
+            model_name="mutualfundbook",
+            name="amount",
             field=models.FloatField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='nav',
+            model_name="mutualfundbook",
+            name="nav",
             field=models.FloatField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='mutualfundbook',
-            name='units',
+            model_name="mutualfundbook",
+            name="units",
             field=models.FloatField(blank=True, null=True),
         ),
     ]

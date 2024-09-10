@@ -12,126 +12,314 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('datahub', '0035_remove_security_event'),
-        ('mutual_funds', '0002_auto_20240525_1522'),
+        ("datahub", "0035_remove_security_event"),
+        ("mutual_funds", "0002_auto_20240525_1522"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Fund',
+            name="Fund",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('meta_title', models.CharField(max_length=255)),
-                ('meta_desc', models.TextField()),
-                ('meta_robots', models.CharField(max_length=50)),
-                ('amc', models.CharField(max_length=100)),
-                ('scheme_code', models.CharField(max_length=20)),
-                ('direct_scheme_code', models.CharField(blank=True, max_length=20, null=True)),
-                ('regular_search_id', models.CharField(blank=True, max_length=50, null=True)),
-                ('scheme_name', models.CharField(max_length=255)),
-                ('registrar_agent', models.CharField(max_length=50)),
-                ('search_id', models.CharField(max_length=50)),
-                ('min_investment_amount', models.PositiveIntegerField()),
-                ('fund_house', models.CharField(max_length=100)),
-                ('fund_manager', models.CharField(max_length=100)),
-                ('launch_date', models.DateField()),
-                ('mini_additional_investment', models.PositiveIntegerField()),
-                ('sip_multiplier', models.PositiveIntegerField()),
-                ('groww_rating', models.FloatField(blank=True, null=True)),
-                ('crisil_rating', models.FloatField(blank=True, null=True)),
-                ('category', models.CharField(max_length=50)),
-                ('rta_scheme_code', models.CharField(max_length=20)),
-                ('exit_load', models.CharField(max_length=255)),
-                ('sub_category', models.CharField(max_length=50)),
-                ('description', models.TextField()),
-                ('benchmark', models.CharField(max_length=100)),
-                ('benchmark_name', models.CharField(max_length=100)),
-                ('aum', models.FloatField()),
-                ('expense_ratio', models.CharField(max_length=10)),
-                ('super_category', models.CharField(max_length=100)),
-                ('sub_sub_category', models.CharField(blank=True, max_length=100, null=True)),
-                ('min_sip_investment', models.PositiveIntegerField()),
-                ('max_sip_investment', models.PositiveIntegerField()),
-                ('min_withdrawal', models.PositiveIntegerField()),
-                ('purchase_multiplier', models.PositiveIntegerField()),
-                ('available_for_investment', models.BooleanField()),
-                ('sip_allowed', models.BooleanField()),
-                ('lumpsum_allowed', models.BooleanField()),
-                ('doc_required', models.BooleanField()),
-                ('nav', models.FloatField()),
-                ('nav_date', models.DateField()),
-                ('plan_type', models.CharField(max_length=50)),
-                ('scheme_type', models.CharField(max_length=50)),
-                ('video_url', models.URLField(blank=True, null=True)),
-                ('fund_news', models.TextField(blank=True, null=True)),
-                ('fund_events', models.TextField(blank=True, null=True)),
-                ('logo_url', models.URLField()),
-                ('sid_url', models.URLField()),
-                ('amc_page_url', models.URLField()),
-                ('isin', models.CharField(max_length=20)),
-                ('groww_scheme_code', models.CharField(max_length=20)),
-                ('stamp_duty', models.CharField(max_length=50)),
-                ('dividend', models.CharField(blank=True, max_length=255, null=True)),
-                ('closed_scheme', models.BooleanField()),
-                ('closed_date', models.DateField(blank=True, null=True)),
-                ('additional_details', models.TextField(blank=True, null=True)),
-                ('prod_code', models.CharField(max_length=20)),
-                ('stp_flag', models.BooleanField()),
-                ('swp_flag', models.BooleanField()),
-                ('switch_flag', models.BooleanField()),
-                ('redemption_amount_multiple', models.PositiveIntegerField(blank=True, null=True)),
-                ('redemption_qty_multiplier', models.PositiveIntegerField(blank=True, null=True)),
-                ('unique_groww_scheme_code', models.CharField(blank=True, max_length=20, null=True)),
-                ('swp_frequencies', models.CharField(blank=True, max_length=255, null=True)),
-                ('blocked_reason', models.TextField(blank=True, null=True)),
-                ('is_additional_check_req', models.BooleanField()),
-                ('sip_return', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('simple_return', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('lock_in', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('historic_exit_loads', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('historic_fund_expense', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('stpDetails', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('swpDetails', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('analysis', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('amc_info', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('category_info', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('stats', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('return_stats', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('fund_manager_details', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('rta_details', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("meta_title", models.CharField(max_length=255)),
+                ("meta_desc", models.TextField()),
+                ("meta_robots", models.CharField(max_length=50)),
+                ("amc", models.CharField(max_length=100)),
+                ("scheme_code", models.CharField(max_length=20)),
+                (
+                    "direct_scheme_code",
+                    models.CharField(blank=True, max_length=20, null=True),
+                ),
+                (
+                    "regular_search_id",
+                    models.CharField(blank=True, max_length=50, null=True),
+                ),
+                ("scheme_name", models.CharField(max_length=255)),
+                ("registrar_agent", models.CharField(max_length=50)),
+                ("search_id", models.CharField(max_length=50)),
+                ("min_investment_amount", models.PositiveIntegerField()),
+                ("fund_house", models.CharField(max_length=100)),
+                ("fund_manager", models.CharField(max_length=100)),
+                ("launch_date", models.DateField()),
+                ("mini_additional_investment", models.PositiveIntegerField()),
+                ("sip_multiplier", models.PositiveIntegerField()),
+                ("groww_rating", models.FloatField(blank=True, null=True)),
+                ("crisil_rating", models.FloatField(blank=True, null=True)),
+                ("category", models.CharField(max_length=50)),
+                ("rta_scheme_code", models.CharField(max_length=20)),
+                ("exit_load", models.CharField(max_length=255)),
+                ("sub_category", models.CharField(max_length=50)),
+                ("description", models.TextField()),
+                ("benchmark", models.CharField(max_length=100)),
+                ("benchmark_name", models.CharField(max_length=100)),
+                ("aum", models.FloatField()),
+                ("expense_ratio", models.CharField(max_length=10)),
+                ("super_category", models.CharField(max_length=100)),
+                (
+                    "sub_sub_category",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                ("min_sip_investment", models.PositiveIntegerField()),
+                ("max_sip_investment", models.PositiveIntegerField()),
+                ("min_withdrawal", models.PositiveIntegerField()),
+                ("purchase_multiplier", models.PositiveIntegerField()),
+                ("available_for_investment", models.BooleanField()),
+                ("sip_allowed", models.BooleanField()),
+                ("lumpsum_allowed", models.BooleanField()),
+                ("doc_required", models.BooleanField()),
+                ("nav", models.FloatField()),
+                ("nav_date", models.DateField()),
+                ("plan_type", models.CharField(max_length=50)),
+                ("scheme_type", models.CharField(max_length=50)),
+                ("video_url", models.URLField(blank=True, null=True)),
+                ("fund_news", models.TextField(blank=True, null=True)),
+                ("fund_events", models.TextField(blank=True, null=True)),
+                ("logo_url", models.URLField()),
+                ("sid_url", models.URLField()),
+                ("amc_page_url", models.URLField()),
+                ("isin", models.CharField(max_length=20)),
+                ("groww_scheme_code", models.CharField(max_length=20)),
+                ("stamp_duty", models.CharField(max_length=50)),
+                ("dividend", models.CharField(blank=True, max_length=255, null=True)),
+                ("closed_scheme", models.BooleanField()),
+                ("closed_date", models.DateField(blank=True, null=True)),
+                ("additional_details", models.TextField(blank=True, null=True)),
+                ("prod_code", models.CharField(max_length=20)),
+                ("stp_flag", models.BooleanField()),
+                ("swp_flag", models.BooleanField()),
+                ("switch_flag", models.BooleanField()),
+                (
+                    "redemption_amount_multiple",
+                    models.PositiveIntegerField(blank=True, null=True),
+                ),
+                (
+                    "redemption_qty_multiplier",
+                    models.PositiveIntegerField(blank=True, null=True),
+                ),
+                (
+                    "unique_groww_scheme_code",
+                    models.CharField(blank=True, max_length=20, null=True),
+                ),
+                (
+                    "swp_frequencies",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("blocked_reason", models.TextField(blank=True, null=True)),
+                ("is_additional_check_req", models.BooleanField()),
+                (
+                    "sip_return",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "simple_return",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "lock_in",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "historic_exit_loads",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "historic_fund_expense",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "stpDetails",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "swpDetails",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "analysis",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "amc_info",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "category_info",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "stats",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "return_stats",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "fund_manager_details",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                (
+                    "rta_details",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='FundInvestment',
+            name="FundInvestment",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('avg_nav', models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)),
-                ('units', models.DecimalField(decimal_places=5, default=0, max_digits=10)),
-                ('units_purchased', django.contrib.postgres.fields.ArrayField(base_field=models.DecimalField(decimal_places=5, default=0, max_digits=10), default=list, size=None)),
-                ('nav_purchased', django.contrib.postgres.fields.ArrayField(base_field=models.DecimalField(decimal_places=5, default=0, max_digits=10), default=list, size=None)),
-                ('fund', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='investments', to='mutual_funds.fund')),
-                ('user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "avg_nav",
+                    models.DecimalField(
+                        blank=True, decimal_places=5, max_digits=10, null=True
+                    ),
+                ),
+                (
+                    "units",
+                    models.DecimalField(decimal_places=5, default=0, max_digits=10),
+                ),
+                (
+                    "units_purchased",
+                    django.contrib.postgres.fields.ArrayField(
+                        base_field=models.DecimalField(
+                            decimal_places=5, default=0, max_digits=10
+                        ),
+                        default=list,
+                        size=None,
+                    ),
+                ),
+                (
+                    "nav_purchased",
+                    django.contrib.postgres.fields.ArrayField(
+                        base_field=models.DecimalField(
+                            decimal_places=5, default=0, max_digits=10
+                        ),
+                        default=list,
+                        size=None,
+                    ),
+                ),
+                (
+                    "fund",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="investments",
+                        to="mutual_funds.fund",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='FundSecurity',
+            name="FundSecurity",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('portfolio_date', models.DateTimeField()),
-                ('nature_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('market_value', models.FloatField()),
-                ('corpus_per', models.FloatField()),
-                ('market_cap', models.CharField(blank=True, max_length=100, null=True)),
-                ('rating_market_cap', models.CharField(blank=True, max_length=100, null=True)),
-                ('scheme_code', models.CharField(blank=True, max_length=100, null=True)),
-                ('fund', models.ForeignKey(help_text='Reference to Fund', on_delete=django.db.models.deletion.CASCADE, related_name='fund_security', to='mutual_funds.fund')),
-                ('security', models.ForeignKey(help_text='Reference to Security', on_delete=django.db.models.deletion.CASCADE, related_name='fund_security', to='datahub.security')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("portfolio_date", models.DateTimeField()),
+                (
+                    "nature_name",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                ("market_value", models.FloatField()),
+                ("corpus_per", models.FloatField()),
+                ("market_cap", models.CharField(blank=True, max_length=100, null=True)),
+                (
+                    "rating_market_cap",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "scheme_code",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                (
+                    "fund",
+                    models.ForeignKey(
+                        help_text="Reference to Fund",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="fund_security",
+                        to="mutual_funds.fund",
+                    ),
+                ),
+                (
+                    "security",
+                    models.ForeignKey(
+                        help_text="Reference to Security",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="fund_security",
+                        to="datahub.security",
+                    ),
+                ),
             ],
         ),
         migrations.AddField(
-            model_name='fund',
-            name='holdings',
-            field=models.ManyToManyField(blank=True, help_text='Securities in this fund', through='mutual_funds.FundSecurity', to='datahub.security'),
+            model_name="fund",
+            name="holdings",
+            field=models.ManyToManyField(
+                blank=True,
+                help_text="Securities in this fund",
+                through="mutual_funds.FundSecurity",
+                to="datahub.security",
+            ),
         ),
     ]

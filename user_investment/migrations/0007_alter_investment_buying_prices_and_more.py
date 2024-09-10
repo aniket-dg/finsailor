@@ -7,18 +7,22 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('user_investment', '0006_investment_buying_prices_investment_selling_prices'),
+        ("user_investment", "0006_investment_buying_prices_investment_selling_prices"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='investment',
-            name='buying_prices',
-            field=django.contrib.postgres.fields.ArrayField(base_field=models.JSONField(default=dict), default=list, size=None),
+            model_name="investment",
+            name="buying_prices",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.JSONField(default=dict), default=list, size=None
+            ),
         ),
         migrations.AlterField(
-            model_name='investment',
-            name='selling_prices',
-            field=django.contrib.postgres.fields.ArrayField(base_field=models.JSONField(default=dict), default=list, size=None),
+            model_name="investment",
+            name="selling_prices",
+            field=django.contrib.postgres.fields.ArrayField(
+                base_field=models.JSONField(default=dict), default=list, size=None
+            ),
         ),
     ]

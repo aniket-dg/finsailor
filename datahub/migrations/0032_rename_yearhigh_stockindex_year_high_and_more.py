@@ -6,18 +6,18 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0031_alter_security_base_security'),
+        ("datahub", "0031_alter_security_base_security"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='stockindex',
-            old_name='yearHigh',
-            new_name='year_high',
+            model_name="stockindex",
+            old_name="yearHigh",
+            new_name="year_high",
         ),
         migrations.RenameField(
-            model_name='stockindex',
-            old_name='yearLow',
-            new_name='year_low',
+            model_name="stockindex",
+            old_name="yearLow",
+            new_name="year_low",
         ),
     ]

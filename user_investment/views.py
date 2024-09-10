@@ -12,24 +12,31 @@ from django.shortcuts import render
 from django_filters import FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import viewsets, status, mixins
+from rest_framework import viewsets, status, mixins, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from combo_investment import settings
 from combo_investment.exception import APIBadRequest
+from combo_investment.utils import is_market_close_today
 from data_import.models import TradeBook
 from data_import.serializers import TradeBookSerializer
 from datahub.models import Security, Parameter
 from datahub.serializers import SecuritySerializerForSectorWisePortfolio
+from industries.models import MacroSector, Sector, Industry, BasicIndustry
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
-from user_investment.models import Investment
+from user_investment.models import Investment, SectorWisePortfolio
 from user_investment.serializer import InvestmentSerializer
 from user_investment.utils import (
     get_securities_by_sector,
     get_security_percentage_change,
+    get_macro_sector_allocation,
+    get_sector_allocation,
+    get_industry_allocation,
+    get_basic_industry_allocation,
 )
+from users.models import User
 
 logger = logging.Logger("UserInvestment")
 
@@ -71,6 +78,12 @@ class UserInvestment:
                 "min": "CH_TRADE_LOW_PRICE",
                 "value": "CH_CLOSING_PRICE",
             },
+            "total_trades": "CH_TOTAL_TRADES",
+            "total_traded_quantity": "CH_TOT_TRADED_QTY",
+            "total_traded_value": "CH_TOT_TRADED_VAL",
+            "52_week_high_price": "CH_52WEEK_HIGH_PRICE",
+            "52_week_low_price": "CH_52WEEK_LOW_PRICE",
+            "isin": "CH_ISIN"
         }
 
     def process_trade_books(self):
@@ -180,13 +193,16 @@ class UserInvestment:
         user_investment.quantity = new_quantity
         user_investment.save()
 
-    def update_security_for_historical_prices(self, security_id, from_year=1980):
+    def update_security_for_historical_prices(self, security_id, from_year, to_date):
         security = Security.objects.filter(id=security_id).last()
         logger.info(
             f"Updating {security.symbol} for historical prices from year {from_year}"
         )
         from_date = datetime.datetime(from_year, 1, 1)
         today_date = datetime.datetime.now()
+
+        if to_date:
+            today_date = to_date
         historical_db_price_info = security.historical_price_info
 
         while from_date < today_date:
@@ -243,6 +259,10 @@ class UserInvestment:
         return historical_db_price_info
 
     def performance(self, broker="all"):
+        market_close_today = is_market_close_today()
+        market_close_value_time = Parameter.objects.filter(
+            name="CLOSE_PRICE_TIME"
+        ).last()
         if broker.lower() == "all":
             user_investments = Investment.objects.filter(quantity__gt=0)
         else:
@@ -255,8 +275,17 @@ class UserInvestment:
 
         top_gainers_security_changes = []
         top_losers_security_changes = []
+        security_processed = set()
+        user_investments = user_investments.select_related("security")
         for investment in user_investments:
-            res = get_security_percentage_change(investment)
+            if investment.security_id in security_processed:
+                continue
+            security_processed.add(investment.security_id)
+            res = get_security_percentage_change(
+                investment,
+                market_close_today,
+                market_close_value_time=market_close_value_time,
+            )
             serialized_security = SecuritySerializerForSectorWisePortfolio(
                 investment.security
             ).data
@@ -311,6 +340,9 @@ class InvestmentFilter(FilterSet):
 class InvestmentViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = InvestmentFilter
+    permission_classes = [
+        # permissions.IsAuthenticated,
+    ]
 
     def get_serializer_class(self):
         logger.warning(self.request.query_params)
@@ -324,15 +356,23 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         return super().get_serializer(*args, **kwargs)
 
     def get_queryset(self):
+        user = User.objects.first()
         broker = self.request.query_params.get("broker", None)
         if broker is None or broker.lower() == "all":
-            qs = Investment.objects.filter(quantity__gt=0)
+            qs = Investment.objects.filter(quantity__gt=0, user=user)
         else:
-            qs = Investment.objects.filter(broker=broker, quantity__gt=0)
+            qs = Investment.objects.filter(broker=broker, quantity__gt=0, user=user)
 
         filter_qs = self.filter_queryset(qs)
 
-        return filter_qs
+        return filter_qs.select_related(
+            "security",
+            "user",
+            "security__basic_industry",
+            "security__basic_industry__industry",
+            "security__basic_industry__industry__sector",
+            "security__basic_industry__industry__sector__macro_sector",
+        )
 
     def create(self, request, *args, **kwargs):
         return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -350,22 +390,25 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         url_name="info",
     )
     def info(self, *args, **kwargs):
-        broker = self.request.query_params.get("broker", None)
+        user = User.objects.first()
+        broker = self.request.query_params.get("broker", "all")
         user_investment = UserInvestment()
         qs = self.get_queryset()
-        logger.warning(qs.values_list("id", flat=True))
         day_change = {}
         one_day_changes = []
         total_investment_value = 0
         total_current_value = 0
-
+        market_close_today = is_market_close_today()
+        market_close_value_time = Parameter.objects.filter(
+            name="CLOSE_PRICE_TIME"
+        ).last()
         for investment in qs:
-            # total_investment_value += investment.calculate_amount_invested(
-            #     broker=broker
-            # )
-            # total_current_value += investment.calculate_current_value(broker=broker)
             security = investment.security
-            security_data = get_security_percentage_change(investment)
+            security_data = get_security_percentage_change(
+                investment,
+                market_close_today=market_close_today,
+                market_close_value_time=market_close_value_time,
+            )
             day_change[security.symbol] = security_data
 
             one_day_changes.append(security_data.get("total_change"))
@@ -409,8 +452,14 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         )
         total_returns = current_value - amount_invested
         total_returns = total_returns.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        current_value = Decimal(total_current_value).quantize(
+        current_value = Decimal(current_value).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+        sector_wise_portfolio = (
+            SectorWisePortfolio.objects.filter(user_id=user.id, broker=broker.lower())
+            .order_by("datetime")
+            .last()
         )
 
         data = {
@@ -421,7 +470,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             "one_day_pchange": one_day_percentage_returns,
             "current_value": format(current_value, ","),
             "day_change": day_change,
-            "sector_wise_portfolio": get_securities_by_sector(qs),
+            "sector_wise_portfolio": sector_wise_portfolio.data,
             "performance": user_investment.performance(broker=broker),
         }
 
@@ -435,10 +484,111 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         url_path="sector_allocation",
     )
     def get_sector_allocation(self, *args, **kwargs):
+        user = User.objects.first()
         broker = self.request.query_params.get("broker", None)
         qs = self.get_queryset()
 
-        data = get_securities_by_sector(qs, show_zero_allocation_sectors=False)
+        sector_wise_portfolio = (
+            SectorWisePortfolio.objects.filter(user_id=user.id, broker=broker.lower())
+            .order_by("datetime")
+            .last()
+        )
+
+        return Response(data=sector_wise_portfolio.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        name="Macro Sector Allocation",
+        url_path="macro_sector_allocation",
+        url_name="macro_sector_allocation",
+    )
+    def get_macro_sector_allocation(self, *args, **kwargs):
+        broker = self.request.query_params.get("broker", None)
+        qs = self.get_queryset()
+        macro_sectors = MacroSector.objects.all()
+        sectors_investments = qs.filter(
+            security__basic_industry__industry__sector__macro_sector_id__in=macro_sectors.values_list(
+                "id", flat=True
+            )
+        )
+        macro_sectors_total_securities = sectors_investments.aggregate(
+            total_quantity=Sum("quantity")
+        )["total_quantity"]
+        data = get_macro_sector_allocation(
+            macro_sectors_total_securities, macro_sectors, sectors_investments
+        )
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        name="Sector Allocation",
+        url_path="ssector_allocation",
+        url_name="ssector_allocation",
+    )
+    def get_ssector_allocation(self, *args, **kwargs):
+        qs = self.get_queryset()
+        sectors = Sector.objects.all()
+        sectors_investments = qs.filter(
+            security__basic_industry__industry__sector_id__in=sectors.values_list(
+                "id", flat=True
+            )
+        )
+        sectors_total_securities = sectors_investments.aggregate(
+            total_quantity=Sum("quantity")
+        )["total_quantity"]
+        data = get_sector_allocation(
+            sectors_total_securities, sectors, sectors_investments
+        )
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        name="Industry Allocation",
+        url_path="industry_allocation",
+        url_name="industry_allocation",
+    )
+    def get_industry_allocation(self, *args, **kwargs):
+        qs = self.get_queryset()
+        industries = Industry.objects.all()
+        industries_investments = qs.filter(
+            security__basic_industry__industry_id__in=industries.values_list(
+                "id", flat=True
+            )
+        )
+        industry_total_securities = industries_investments.aggregate(
+            total_quantity=Sum("quantity")
+        )["total_quantity"]
+        data = get_industry_allocation(
+            industry_total_securities, industries, industries_investments
+        )
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        name="Basic Industry Allocation",
+        url_path="basic_industry_allocation",
+        url_name="basic_industry_allocation",
+    )
+    def get_basic_industry_allocation(self, *args, **kwargs):
+        qs = self.get_queryset()
+        basic_industries = BasicIndustry.objects.all()
+        basic_industries_investments = qs.filter(
+            security__basic_industry__industry_id__in=basic_industries.values_list(
+                "id", flat=True
+            )
+        )
+        basic_industry_total_securities = basic_industries_investments.aggregate(
+            total_quantity=Sum("quantity")
+        )["total_quantity"]
+        data = get_basic_industry_allocation(
+            basic_industry_total_securities,
+            basic_industries,
+            basic_industries_investments,
+        )
         return Response(data=data, status=status.HTTP_200_OK)
 
 
@@ -484,3 +634,10 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return TradeBookSerializer
+
+
+def demo(request):
+    date = "2010-05-21"
+    x = Security.select_related.filter(id=1).with_close_price(date)
+    data = x
+    return render(request, "industries/a.html", context={"data": data})

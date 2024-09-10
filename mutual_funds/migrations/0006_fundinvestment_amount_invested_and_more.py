@@ -6,33 +6,33 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mutual_funds', '0005_alter_fund_category_alter_fund_meta_robots_and_more'),
+        ("mutual_funds", "0005_alter_fund_category_alter_fund_meta_robots_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='fundinvestment',
-            name='amount_invested',
+            model_name="fundinvestment",
+            name="amount_invested",
             field=models.DecimalField(decimal_places=5, default=0, max_digits=10),
         ),
         migrations.AddField(
-            model_name='fundinvestment',
-            name='current_value',
+            model_name="fundinvestment",
+            name="current_value",
             field=models.DecimalField(decimal_places=5, default=0, max_digits=10),
         ),
         migrations.AddField(
-            model_name='fundinvestment',
-            name='folio_number',
+            model_name="fundinvestment",
+            name="folio_number",
             field=models.CharField(blank=True, max_length=500, null=True),
         ),
         migrations.AddField(
-            model_name='fundinvestment',
-            name='isin',
+            model_name="fundinvestment",
+            name="isin",
             field=models.CharField(blank=True, max_length=100, null=True),
         ),
         migrations.AddField(
-            model_name='fundinvestment',
-            name='xirr',
+            model_name="fundinvestment",
+            name="xirr",
             field=models.CharField(blank=True, max_length=100, null=True),
         ),
     ]

@@ -7,14 +7,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('data_import', '0026_alter_mutualfundbook_nav_alter_mutualfundbook_units'),
-        ('user_investment', '0011_alter_investment_security'),
+        ("data_import", "0026_alter_mutualfundbook_nav_alter_mutualfundbook_units"),
+        ("user_investment", "0011_alter_investment_security"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='brokerinvestment',
-            name='trade_book',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='broker_investment', to='data_import.tradebook'),
+            model_name="brokerinvestment",
+            name="trade_book",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="broker_investment",
+                to="data_import.tradebook",
+            ),
         ),
     ]

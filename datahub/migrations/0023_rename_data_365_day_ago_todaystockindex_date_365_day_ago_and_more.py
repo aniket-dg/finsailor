@@ -6,24 +6,24 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0022_todaystockindex'),
+        ("datahub", "0022_todaystockindex"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='todaystockindex',
-            old_name='data_365_day_ago',
-            new_name='date_365_day_ago',
+            model_name="todaystockindex",
+            old_name="data_365_day_ago",
+            new_name="date_365_day_ago",
         ),
         migrations.AddField(
-            model_name='stockindex',
-            name='date',
+            model_name="stockindex",
+            name="date",
             field=models.DateField(auto_now_add=True, default=None),
             preserve_default=False,
         ),
         migrations.AddField(
-            model_name='stockindex',
-            name='time',
+            model_name="stockindex",
+            name="time",
             field=models.TimeField(auto_now_add=True, default=None),
             preserve_default=False,
         ),

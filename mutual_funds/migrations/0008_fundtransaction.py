@@ -6,31 +6,45 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mutual_funds', '0007_alter_fundsecurity_options'),
+        ("mutual_funds", "0007_alter_fundsecurity_options"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='FundTransaction',
+            name="FundTransaction",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('external', models.BooleanField()),
-                ('remark', models.CharField(max_length=255)),
-                ('user_account_id', models.CharField(max_length=50)),
-                ('transaction_id', models.CharField(max_length=50)),
-                ('scheme_code', models.CharField(max_length=20)),
-                ('units', models.FloatField()),
-                ('folio_number', models.CharField(max_length=50)),
-                ('transaction_amount', models.DecimalField(decimal_places=5, default=0, max_digits=10)),
-                ('transaction_price', models.DecimalField(decimal_places=5, default=0, max_digits=10)),
-                ('transaction_type', models.CharField(max_length=50)),
-                ('transaction_status', models.CharField(max_length=50)),
-                ('transaction_time', models.DateTimeField()),
-                ('transaction_date', models.DateField()),
-                ('purchase_date', models.DateTimeField()),
-                ('hidden', models.BooleanField()),
-                ('transaction_source', models.CharField(max_length=50)),
-                ('transaction_sub_type', models.CharField(max_length=50)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("external", models.BooleanField()),
+                ("remark", models.CharField(max_length=255)),
+                ("user_account_id", models.CharField(max_length=50)),
+                ("transaction_id", models.CharField(max_length=50)),
+                ("scheme_code", models.CharField(max_length=20)),
+                ("units", models.FloatField()),
+                ("folio_number", models.CharField(max_length=50)),
+                (
+                    "transaction_amount",
+                    models.DecimalField(decimal_places=5, default=0, max_digits=10),
+                ),
+                (
+                    "transaction_price",
+                    models.DecimalField(decimal_places=5, default=0, max_digits=10),
+                ),
+                ("transaction_type", models.CharField(max_length=50)),
+                ("transaction_status", models.CharField(max_length=50)),
+                ("transaction_time", models.DateTimeField()),
+                ("transaction_date", models.DateField()),
+                ("purchase_date", models.DateTimeField()),
+                ("hidden", models.BooleanField()),
+                ("transaction_source", models.CharField(max_length=50)),
+                ("transaction_sub_type", models.CharField(max_length=50)),
             ],
         ),
     ]

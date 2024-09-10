@@ -6,18 +6,26 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0035_remove_security_event'),
+        ("datahub", "0035_remove_security_event"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Holidays',
+            name="Holidays",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('trading_date', models.DateField()),
-                ('weekday', models.CharField(max_length=100)),
-                ('description', models.CharField(max_length=500)),
-                ('sr_no', models.IntegerField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("trading_date", models.DateField()),
+                ("weekday", models.CharField(max_length=100)),
+                ("description", models.CharField(max_length=500)),
+                ("sr_no", models.IntegerField()),
             ],
         ),
     ]

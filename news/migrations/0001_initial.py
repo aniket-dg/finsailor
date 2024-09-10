@@ -7,18 +7,25 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='StockEvent',
+            name="StockEvent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('company', models.CharField(max_length=500)),
-                ('purpose', models.CharField(max_length=100)),
-                ('details', models.TextField(blank=True, null=True)),
-                ('date', models.DateField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("company", models.CharField(max_length=500)),
+                ("purpose", models.CharField(max_length=100)),
+                ("details", models.TextField(blank=True, null=True)),
+                ("date", models.DateField()),
             ],
         ),
     ]

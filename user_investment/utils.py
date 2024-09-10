@@ -1,30 +1,41 @@
 import datetime
+import json
 import logging
 from _decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 
+import json5
 from django.db.models import Sum, DecimalField
 from django.db.models.functions import Cast
 
 from combo_investment import settings
 from combo_investment.settings import TIME_ZONE
 from combo_investment.utils import is_market_close_today
-from datahub.models import Security, Parameter
+from datahub.models import Security, Parameter, TodaysMacroSectorPerformance
 from datahub.serializers import (
     SecuritySerializer,
     SecuritySerializerForSectorWisePortfolio,
 )
-from industries.models import MacroSector, Sector, Industry, BasicIndustry
+from industries.models import (
+    MacroSector,
+    Sector,
+    Industry,
+    BasicIndustry,
+)
 from django.db import models
 
 from datetime import date, timedelta
 from django.db.models import Count, F, Sum
 
+from user_investment.models import SectorWisePortfolio
+
 logger = logging.Logger("UserInvestment - Utils")
 
 
-def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
+def get_securities_by_sector(
+    user, broker, investments, show_zero_allocation_sectors=True
+):
     sector_wise_portfolio = {
         "basic_industry": {},
         "industry": {},
@@ -168,7 +179,13 @@ def get_securities_by_sector(investments, show_zero_allocation_sectors=True):
 
     sector_wise_portfolio["basic_industry"] = basic_industries_data
 
-    return {"data": sector_wise_portfolio, "metadata": metadata}
+    sector_portfolio = SectorWisePortfolio(
+        user=user,
+        broker=broker,
+        data={"data": sector_wise_portfolio, "metadata": metadata},
+    )
+    sector_portfolio.save()
+    return sector_portfolio.data
 
 
 def get_macro_sector_allocation(
@@ -337,18 +354,20 @@ def get_security_allocation(total_securities, investments):
     return securities
 
 
-def get_security_percentage_change(investment):
+def get_security_percentage_change(
+    investment, market_close_today, market_close_value_time=None
+):
     security = investment.security
-    market_close_value_time = Parameter.objects.filter(name="CLOSE_PRICE_TIME").last()
+    if market_close_value_time is None:
+        market_close_value_time = Parameter.objects.filter(
+            name="CLOSE_PRICE_TIME"
+        ).last()
 
     local_tz = ZoneInfo(settings.TIME_ZONE)
     today = datetime.datetime.now().astimezone(local_tz)
     today_data = security.historical_price_info.get(today.date().isoformat())
 
-    if is_market_close_today():
-        today_data = None
-
-    if today_data is None:
+    if market_close_today:
         last_date = sorted(security.historical_price_info.keys())[-1]
         today_data = security.historical_price_info.get(last_date)
 
@@ -374,18 +393,15 @@ def get_security_percentage_change(investment):
     return res
 
 
-def calculate_todays_performance_by_macro_sector(securities):
+def calculate_todays_performance_by_macro_sector():
+    securities = Security.select_related.filter(security_info__tradingStatus="Active")
     security = Security.objects.filter(symbol__in=["SJVN", "IRB", "SAIL", "PNB"]).last()
     macro_sectors = MacroSector.objects.all()
     macro_sector_name_to_securities = {}
 
     local_tz = ZoneInfo(TIME_ZONE)
     today_date = datetime.datetime.now().astimezone(local_tz).date()
-    yesterday_date = (today_date - timedelta(days=1)).isoformat()
-    if is_market_close_today():
-        sorted_data = sorted(security.historical_price_info.keys())
-        today_date = sorted_data[-1]
-        yesterday_date = sorted_data[-2]
+    yesterday_date = (today_date - timedelta(days=1))
     for macro_sector in macro_sectors:
         macro_sector_securities = securities.filter(
             basic_industry__industry__sector__macro_sector_id=macro_sector.id
@@ -394,8 +410,8 @@ def calculate_todays_performance_by_macro_sector(securities):
         todays_prices = []
 
         for security in macro_sector_securities:
-            logger.warning(security.id, security.symbol)
-            yesterdays_data = security.historical_price_info.get(yesterday_date)
+            yesterdays_data = get_last_updated_historical_data(security, yesterday_date)
+
             yesterdays_price = (
                 yesterdays_data["close"]
                 if yesterdays_data["close"]
@@ -423,4 +439,23 @@ def calculate_todays_performance_by_macro_sector(securities):
         }
 
     res["date"] = today_date.strftime("%d %B %Y")
-    return res
+
+    now = datetime.datetime.now()
+    todays_macro_sector_performance = TodaysMacroSectorPerformance(
+        datetime=now, data=res
+    )
+
+    todays_macro_sector_performance.save()
+    # return res
+
+
+def get_last_updated_historical_data(security, last_date):
+    data_present = 0
+    historical_data = None
+    while not data_present:
+        historical_data = security.historical_price_info.get(last_date.isoformat())
+        if historical_data:
+            break
+        last_date -= timedelta(days=1)
+
+    return historical_data

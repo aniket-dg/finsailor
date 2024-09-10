@@ -7,24 +7,27 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0035_remove_security_event'),
-        ('user_investment', '0013_investment_broker'),
+        ("datahub", "0035_remove_security_event"),
+        ("user_investment", "0013_investment_broker"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='investment',
-            name='unique_security_user',
+            model_name="investment",
+            name="unique_security_user",
         ),
         migrations.AlterField(
-            model_name='investment',
-            name='broker',
-            field=models.CharField(default='Groww', max_length=100),
+            model_name="investment",
+            name="broker",
+            field=models.CharField(default="Groww", max_length=100),
             preserve_default=False,
         ),
         migrations.AddConstraint(
-            model_name='investment',
-            constraint=models.UniqueConstraint(fields=('broker', 'security', 'user'), name='unique_broker_security_user'),
+            model_name="investment",
+            constraint=models.UniqueConstraint(
+                fields=("broker", "security", "user"),
+                name="unique_broker_security_user",
+            ),
         ),
     ]

@@ -106,4 +106,3 @@ class ImportDematReportData(APIView):
             {"investment_books": serialized_investment_books},
             status=status.HTTP_201_CREATED,
         )
-

@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('mutual_funds', '0006_fundinvestment_amount_invested_and_more'),
+        ("mutual_funds", "0006_fundinvestment_amount_invested_and_more"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='fundsecurity',
-            options={'verbose_name_plural': 'Fund Securities'},
+            name="fundsecurity",
+            options={"verbose_name_plural": "Fund Securities"},
         ),
     ]

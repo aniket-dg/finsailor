@@ -10,25 +10,28 @@ from datahub.models import (
     TodayStockIndex,
     GeneralInfo,
     Holiday,
+    TodaysMacroSectorPerformance,
 )
 from django.utils.translation import gettext_lazy as _
 
+
 class MonthFilter(admin.SimpleListFilter):
-    title = _('month')
-    parameter_name = 'month'
+    title = _("month")
+    parameter_name = "month"
 
     def lookups(self, request, model_admin):
         # Generate a list of months with transactions
         months = set()
         for holiday in model_admin.model.objects.all():
-            months.add(holiday.trading_date.strftime('%Y-%m'))
+            months.add(holiday.trading_date.strftime("%Y-%m"))
         return [(month, month) for month in sorted(months)]
 
     def queryset(self, request, queryset):
         if self.value():
-            year, month = self.value().split('-')
+            year, month = self.value().split("-")
             return queryset.filter(trading_date__year=year, trading_date__month=month)
         return queryset
+
 
 @admin.register(Security)
 class SecurityAdmin(admin.ModelAdmin):
@@ -67,3 +70,8 @@ class GeneralInfoAdmin(admin.ModelAdmin):
 class HolidayAdmin(admin.ModelAdmin):
     list_display = ["id", "trading_date", "description", "weekday"]
     list_filter = [MonthFilter]
+
+
+@admin.register(TodaysMacroSectorPerformance)
+class TodaysMacroSectorPerformanceAdmin(admin.ModelAdmin):
+    list_display = ["id", "datetime", "data"]

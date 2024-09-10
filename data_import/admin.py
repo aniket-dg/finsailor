@@ -18,6 +18,7 @@ from datahub.models import Broker
 class TradeBookAdmin(admin.ModelAdmin):
     list_display = [
         "id",
+        "user",
         "execution_datetime",
         "security",
         "broker",
@@ -29,6 +30,7 @@ class TradeBookAdmin(admin.ModelAdmin):
     ]
 
     list_filter = [
+        "user",
         "broker",
         "buy_sell",
         "processed",

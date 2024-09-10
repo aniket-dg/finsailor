@@ -25,6 +25,7 @@ class SecurityFilter(FilterSet):
     symbol = django_filters.CharFilter(field_name="symbol", lookup_expr="iexact")
     name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
     id = django_filters.CharFilter(method="filter_by_ids")
+    limit = django_filters.NumberFilter()
 
     def filter_by_ids(self, queryset, name, value):
         ids = value.split(",")
@@ -49,6 +50,7 @@ class SecurityViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Security.objects.none()
+
         return Security.objects.all()
 
     def perform_create(self, serializer):

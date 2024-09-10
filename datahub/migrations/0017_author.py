@@ -6,15 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0016_securitycache'),
+        ("datahub", "0016_securitycache"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Author',
+            name="Author",
             fields=[
-                ('author_id', models.BigAutoField(primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
+                ("author_id", models.BigAutoField(primary_key=True, serialize=False)),
+                ("name", models.CharField(max_length=100)),
             ],
         ),
     ]

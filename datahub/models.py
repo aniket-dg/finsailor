@@ -1,13 +1,14 @@
 from json import JSONEncoder
 
 from django.db import models
+from django.db.models import QuerySet, F
 from django.utils.translation import gettext_lazy as _
 from bsedata.bse import BSE
 import datetime
 import decimal
 
 from industries.models import BasicIndustry
-
+from django.db.models import Func, Value, CharField
 
 class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
@@ -17,9 +18,36 @@ class CustomJSONEncoder(JSONEncoder):
             return float(obj)
 
 
+class JSONExtractPathText(Func):
+    function = 'jsonb_extract_path_text'
+    template = "%(function)s(%(expressions)s)"
+
+    def __init__(self, expression, *paths, **extra):
+        paths = [expression] + list(paths)
+        super().__init__(*paths, output_field=CharField(), **extra)
+
+
 class SecurityCache(models.Model):
     name = models.CharField(max_length=100)
     symbol = models.CharField(max_length=100)
+
+
+class SecurityQuerySet(QuerySet):
+    def with_related(self):
+        return self.select_related("basic_industry__industry__sector__macro_sector")
+
+    def with_close_price(self, date):
+        return self.annotate(
+            last_price=JSONExtractPathText(F('historical_price_info'), Value(date), Value('lastPrice'))
+        ).values('symbol', 'last_price','market_cap', 'free_float_market_cap')
+
+
+class SecurityManager(models.Manager):
+    def get_queryset(self):
+        return SecurityQuerySet(self.model, using=self._db).with_related()
+
+    def with_close_price(self, date):
+        return SecurityQuerySet(self.model, using=self._db).with_close_price(date=date)
 
 
 class Security(models.Model):
@@ -30,11 +58,21 @@ class Security(models.Model):
     last_updated_price = models.DecimalField(
         decimal_places=10, null=True, blank=True, max_digits=30
     )
+    market_cap = models.DecimalField(
+        decimal_places=10, null=True, blank=True, max_digits=30
+    )
+    free_float_market_cap = models.DecimalField(
+        decimal_places=10, null=True, blank=True, max_digits=30
+    )
     price_modified_datetime = models.DateTimeField(blank=True, null=True)
     basic_industry = models.ForeignKey(
         BasicIndustry, on_delete=models.SET_NULL, null=True, blank=True
     )
     historical_price_info = models.JSONField(
+        default=dict,
+        encoder=CustomJSONEncoder,
+    )
+    trade_info = models.JSONField(
         default=dict,
         encoder=CustomJSONEncoder,
     )
@@ -47,6 +85,9 @@ class Security(models.Model):
         encoder=CustomJSONEncoder,
     )
     base_security = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    select_related = SecurityManager()
 
     def __str__(self):
         return f"Security - {self.name}"
@@ -108,18 +149,32 @@ class StockIndex(models.Model):
     oneWeekAgo = models.CharField(max_length=100, null=True, blank=True)
     oneMonthAgo = models.CharField(max_length=100, null=True, blank=True)
     oneYearAgo = models.CharField(max_length=100, null=True, blank=True)
-    date = models.DateField(auto_now_add=True)
-    time = models.TimeField(auto_now_add=True)
+    date = models.DateField()
+    time = models.TimeField()
 
+    class Meta:
+        unique_together = ["index", "date", "time"]
+
+    def get_empty_object(self):
+        new_stock_index = self
+        fields_to_update_none = ["pk", "variation", "percentChange", "previousClose", "yearHigh", "yearLow",
+                                 "indicativeClose", "pe", "pb", "dy", "declines", "unchanged", "perChange356d",
+                                 "day365dAgo", "chart365dPath", "date30dAgo", "perChange30d", "chart30dPath",
+                                 "chartTodayPath", "previousDay", "oneWeekAgo", "oneMonthAgo", "oneYearAgo",
+                                 ]
+        for field in fields_to_update_none:
+            setattr(new_stock_index, field, None)
+
+        return new_stock_index
     @classmethod
     def update_or_create_from_dict(cls, data):
         obj, created = cls.objects.update_or_create(
             key=data.get("key"),
+            index=data.get("index"),
+            indexSymbol=data.get("indexSymbol"),
             date=data.get("date"),
             time=data.get("time"),
             defaults={
-                "index": data.get("index"),
-                "indexSymbol": data.get("indexSymbol"),
                 "last": data.get("last"),
                 "variation": data.get("variation"),
                 "percentChange": data.get("percentChange"),
@@ -177,3 +232,11 @@ class Holiday(models.Model):
 
     def __str__(self):
         return f"Hoiliday - {self.trading_date}"
+
+
+class TodaysMacroSectorPerformance(models.Model):
+    datetime = models.DateTimeField(auto_now_add=True)
+    data = models.JSONField(default=dict, encoder=CustomJSONEncoder)
+
+    def __str__(self):
+        return f"TodaysMacroSectorPerformance - {self.datetime}"

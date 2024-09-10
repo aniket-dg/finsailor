@@ -7,20 +7,41 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0021_stockindex'),
+        ("datahub", "0021_stockindex"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='TodayStockIndex',
+            name="TodayStockIndex",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('date', models.DateField(blank=True, null=True)),
-                ('time', models.TimeField(blank=True, null=True)),
-                ('historical_dates_info', models.JSONField(default=dict, encoder=datahub.models.CustomJSONEncoder)),
-                ('date_30_day_ago', models.DateField(blank=True, null=True)),
-                ('data_365_day_ago', models.DateField(blank=True, null=True)),
-                ('stocks_indices', models.ManyToManyField(blank=True, null=True, related_name='todays_stock_index', to='datahub.stockindex')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("date", models.DateField(blank=True, null=True)),
+                ("time", models.TimeField(blank=True, null=True)),
+                (
+                    "historical_dates_info",
+                    models.JSONField(
+                        default=dict, encoder=datahub.models.CustomJSONEncoder
+                    ),
+                ),
+                ("date_30_day_ago", models.DateField(blank=True, null=True)),
+                ("data_365_day_ago", models.DateField(blank=True, null=True)),
+                (
+                    "stocks_indices",
+                    models.ManyToManyField(
+                        blank=True,
+                        null=True,
+                        related_name="todays_stock_index",
+                        to="datahub.stockindex",
+                    ),
+                ),
             ],
         ),
     ]

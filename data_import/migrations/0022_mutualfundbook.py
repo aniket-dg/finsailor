@@ -8,24 +8,55 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('data_import', '0021_alter_investmentbook_user'),
+        ("data_import", "0021_alter_investmentbook_user"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='MutualFundBook',
+            name="MutualFundBook",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('scheme_name', models.CharField(max_length=500)),
-                ('transaction_type', models.CharField(max_length=100)),
-                ('units', models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)),
-                ('nav', models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)),
-                ('amount', models.DecimalField(blank=True, decimal_places=5, max_digits=10, null=True)),
-                ('date', models.DateField(blank=True, null=True)),
-                ('processed', models.BooleanField(default=False)),
-                ('investment_processed', models.BooleanField(default=False)),
-                ('user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("scheme_name", models.CharField(max_length=500)),
+                ("transaction_type", models.CharField(max_length=100)),
+                (
+                    "units",
+                    models.DecimalField(
+                        blank=True, decimal_places=5, max_digits=10, null=True
+                    ),
+                ),
+                (
+                    "nav",
+                    models.DecimalField(
+                        blank=True, decimal_places=5, max_digits=10, null=True
+                    ),
+                ),
+                (
+                    "amount",
+                    models.DecimalField(
+                        blank=True, decimal_places=5, max_digits=10, null=True
+                    ),
+                ),
+                ("date", models.DateField(blank=True, null=True)),
+                ("processed", models.BooleanField(default=False)),
+                ("investment_processed", models.BooleanField(default=False)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
     ]

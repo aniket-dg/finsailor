@@ -6,18 +6,18 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0024_alter_stockindex_advances_and_more'),
+        ("datahub", "0024_alter_stockindex_advances_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='stockindex',
-            name='chart365dPath',
+            model_name="stockindex",
+            name="chart365dPath",
             field=models.CharField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='stockindex',
-            name='perChange365d',
+            model_name="stockindex",
+            name="perChange365d",
             field=models.CharField(blank=True, null=True),
         ),
     ]

@@ -16,6 +16,7 @@ packages_with_tasks = [
     "scrapper",
     "user_investment",
     "users",
+    "groww",
 ]
 
 app.config_from_object("django.conf:settings", namespace="CELERY")

@@ -9,6 +9,4 @@ router.register(r"investment", views.InvestmentViewSet, basename="Investment")
 router.register(r"transactions", views.TransactionViewSet, basename="Transaction")
 
 
-urlpatterns = [
-    re_path("^", include(router.urls)),
-]
+urlpatterns = [re_path("^", include(router.urls)), path("demo/", views.demo)]

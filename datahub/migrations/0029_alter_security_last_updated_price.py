@@ -6,13 +6,15 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0028_alter_security_last_updated_price'),
+        ("datahub", "0028_alter_security_last_updated_price"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='security',
-            name='last_updated_price',
-            field=models.DecimalField(blank=True, decimal_places=10, max_digits=30, null=True),
+            model_name="security",
+            name="last_updated_price",
+            field=models.DecimalField(
+                blank=True, decimal_places=10, max_digits=30, null=True
+            ),
         ),
     ]

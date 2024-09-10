@@ -6,21 +6,25 @@ from mutual_funds.models import FundSecurity, Fund
 from scrapper.views import NSEScrapper
 from datahub.tasks import update_security_price
 
-def get_or_create_security(name):
+
+def get_or_create_security(name, base_security=True):
     nse = NSEScrapper()
     symbol = nse.get_symbol(name)
     security, created = Security.objects.get_or_create(
-        symbol=symbol, defaults={"name": name}
+        symbol=symbol, defaults={"name": name, "base_security": base_security}
     )
     if created:
         update_security_price.delay(security.id)
     return security
 
+
 def create_fund_securities(fund: Fund, securities: List[dict]):
     fund.holdings.all().delete()
     for security in securities:
-        sec = get_or_create_security(security["company_name"])
-        portfolio_date = datetime.datetime.strptime(security["portfolio_date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        sec = get_or_create_security(security["company_name"], base_security=False)
+        portfolio_date = datetime.datetime.strptime(
+            security["portfolio_date"], "%Y-%m-%dT%H:%M:%S.%fZ"
+        )
         fund_security = FundSecurity(
             security_id=sec.id,
             fund_id=fund.id,

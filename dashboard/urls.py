@@ -19,5 +19,5 @@ urlpatterns = [
         "import/demat-report/",
         views.ImportDematReportData.as_view(),
         name="import-demat",
-    )
+    ),
 ]

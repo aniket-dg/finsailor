@@ -6,16 +6,16 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('user_investment', '0004_alter_investment_avg_price'),
+        ("user_investment", "0004_alter_investment_avg_price"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='investment',
-            name='buying_prices',
+            model_name="investment",
+            name="buying_prices",
         ),
         migrations.RemoveField(
-            model_name='investment',
-            name='selling_prices',
+            model_name="investment",
+            name="selling_prices",
         ),
     ]

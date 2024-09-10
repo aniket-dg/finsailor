@@ -6,15 +6,23 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0018_delete_author'),
+        ("datahub", "0018_delete_author"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='GeneralInfo',
+            name="GeneralInfo",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('tradebook_last_uploaded', models.DateField(blank=True, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("tradebook_last_uploaded", models.DateField(blank=True, null=True)),
             ],
         ),
     ]

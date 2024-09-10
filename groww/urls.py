@@ -6,7 +6,9 @@ from . import views
 
 router = routers.SimpleRouter()
 router.register(r"", views.GrowwRequestViewSet, basename="GrowwRequest")
-router.register(r"header", views.GrowwRequestHeaderViewSet, basename="GrowwRequest-Header")
+router.register(
+    r"header", views.GrowwRequestHeaderViewSet, basename="GrowwRequest-Header"
+)
 
 
 urlpatterns = [

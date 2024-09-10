@@ -1,6 +1,7 @@
 import datetime
 import json
 from _decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from convert_to_requests import curl_to_requests, to_python_code
 
@@ -12,7 +13,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from combo_investment import settings
-from groww.models import GrowwRequestHeader
+from datahub.models import Security
+from groww.models import GrowwRequestHeader, GrowwRequestError
 from groww.serializers import (
     GrowwRequestSerializer,
     SchemeSearchSerializer,
@@ -26,26 +28,55 @@ from mutual_funds.models import (
     FundInvestmentFolio,
     SIPDetails,
 )
-from mutual_funds.utils import create_fund_securities
+from mutual_funds.utils import create_fund_securities, get_or_create_security
+from user_investment.models import Investment, BrokerTypeENUM, StockTransactions
 
 # from mutual_funds.models import Fund
 # from mutual_funds.serializers import FundSerializer
 from users.models import User
 
 
+class GrowwRequestException(Exception):
+    def save(self):
+        groww_request_error = GrowwRequestError(url=self.url)
+        groww_request_error.data = json.loads(self.msg)
+        groww_request_error.save()
+
+    def __init__(self, url=None, msg=None, *args):
+        super().__init__(*args)
+        self.url = url
+        self.msg = msg
+        self.save()
+
+
 class GrowwRequest:
     def __init__(self, user=None, http_method="get"):
         if user is None:
-            user = User.objects.last()
-        self.user = User.objects.last()
+            user = User.objects.first()
+        self.user = User.objects.first()
         groww_request_headers = GrowwRequestHeader.objects.filter(
             user=user, method=http_method
         ).last()
         if groww_request_headers is None:
-            raise Exception("Please Set Groww Request Headers first!")
+            raise GrowwRequestException("Please Set Groww Request Headers first!")
 
         self._session = requests.Session()
         self._session.headers = groww_request_headers.headers
+
+    def get_all_mf(self, page=0, size=20):
+        url = settings.GROWW_MF_LIST
+        response = self._session.get(
+            url,
+            params={
+                "page": page,
+                "size": size,
+            },
+        )
+        if response.status_code != 200:
+            raise GrowwRequestException(response.text)
+
+        data = response.json()
+        return data
 
     def get_mf_investment(self):
         # Required - GET headers
@@ -54,31 +85,36 @@ class GrowwRequest:
         response = self._session.get(url)
 
         if response.status_code != 200:
-            raise Exception(response.text)
+            raise GrowwRequestException(response.text)
 
         return response.json()
 
-    # def get_scheme_details(self, scheme_isin, scheme_type):
-    #     # Required - POST headers
-    #     groww_request_headers = GrowwRequestHeader.objects.filter(
-    #         user=self.user, method="post"
-    #     ).last()
-    #     if groww_request_headers is None:
-    #         raise Exception("Please Set Groww Request Headers first!")
-    #
-    #     body = json.dumps({"isin": scheme_isin, "schemeType": scheme_type})
-    #     url = settings.GROWW_MF_SCHEME_DETAILS
-    #
-    #     response = self._session.post(url, data=body)
-    #
-    #     if response.status_code != 200:
-    #         raise Exception(response.text)
-    #
-    #     return response.json()
+    def import_all_mf_funds(self, partial=True):
+        mutual_funds = self.get_all_mf()
+        print(mutual_funds)
+        for mf in mutual_funds["content"]:
+            from groww.tasks import create_or_update_groww_fund
+
+            create_or_update_groww_fund.delay(mf["search_id"])
+        return
+
+    def create_or_update_fund(self, search_id):
+        fund_details = self.get_scheme_details(search_id)
+
+        fund = Fund.create_or_update_from_dict(fund_details)
+
+        local_tz = ZoneInfo(settings.TIME_ZONE)
+        if (
+            datetime.datetime.now().astimezone(local_tz)
+            - fund.last_updated.astimezone(local_tz)
+        ).days > 5:
+            holdings = fund_details.get("holdings")
+            create_fund_securities(fund=fund, securities=holdings)
+        fund.save()
+        return fund
 
     def get_scheme_transactions(self, folio_number, scheme_code, page=0, size=100):
         # Required - GET headers
-
         query_params = {
             "folio_number": folio_number,
             "page": page,
@@ -96,22 +132,59 @@ class GrowwRequest:
             raise Exception(
                 "Unable to fetch Scheme Transactions ->", folio_number, scheme_code
             )
-        return response["data"]["transaction_list"]
+        return response["data"]
 
     def get_scheme_details(self, search_id: str):
         url = settings.GROWW_MF_SCHEME_DETAILS + search_id
-        print(url, "url")
         response = self._session.get(url)
         if response.status_code != 200:
-            raise Exception((response.text, url))
+            raise GrowwRequestException(url=url, msg=response.text)
 
         return response.json()
+
+    def get_stock_investment(self):
+        url = settings.GROWW_STOCK_INVESTMENT_DASHBOARD
+
+        response = self._session.get(url)
+
+        if response.status_code != 200:
+            raise GrowwRequestException(url, response.text)
+
+        return response.json()
+
+    def get_stock_investment_transactions(self, isin, till_date, page=0):
+        url = settings.GROWW_STOCK_INVESTMENT_TRANSACTIONS.format(isin)
+        all_transactions = []
+        page = 0
+        while page != -1:
+            response = self._session.get(url, params={"page": page})
+            if response.status_code != 200:
+                raise GrowwRequestException(response.text)
+            transactions = response.json()["data"]["transactions"]
+            page += 1
+            if len(transactions) > 0:
+                last_transaction = transactions[-1]
+                trade_date = datetime.datetime.strptime(
+                    last_transaction.get("tradeDate"), "%Y-%m-%d"
+                ).date()
+                if till_date and till_date >= trade_date:
+                    page = -1
+            else:
+                page = -1
+            all_transactions.extend(transactions)
+
+        return all_transactions
 
 
 class GrowwInvestment:
     def __init__(self, user=None):
         self._user = user
         self._groww_request = GrowwRequest(user=self._user)
+
+    def update_mf_funds(self):
+        funds = Fund.objects.all()
+        for fund in funds:
+            self._groww_request.create_or_update_fund(fund.search_id)
 
     def import_mutual_funds(self):
         all_investments = self._groww_request.get_mf_investment()
@@ -120,11 +193,7 @@ class GrowwInvestment:
             self.process_investment(investment=investment)
 
     def process_investment(self, investment, partial_update=False):
-        fund_details = self._groww_request.get_scheme_details(
-            investment.get("searchId")
-        )
-
-        fund = self.create_or_update_fund(fund_details, partial_update=partial_update)
+        fund = self._groww_request.create_or_update_fund(investment.get("searchId"))
 
         fund_investment, created = FundInvestment.objects.get_or_create(
             fund_id=fund.id, user=self._user
@@ -164,21 +233,24 @@ class GrowwInvestment:
                 )
                 sip_details.save()
 
-                fund_investment_folio = FundInvestmentFolio(
+                (
+                    fund_investment_folio,
+                    created,
+                ) = FundInvestmentFolio.objects.update_or_create(
                     folio_number=folio_number,
-                    units=units,
-                    amount_invested=amount_invested,
-                    average_nav=average_nav,
-                    current_value=current_value,
-                    xirr=xirr,
-                    portfolio_source=portfolio_source,
-                    folio_type=folio_type,
-                    first_unrealised_purchase_date=first_unrealised_purchase_date,
-                    sip_details=sip_details,
-                    user=self._user,
+                    defaults={
+                        "units": units,
+                        "amount_invested": amount_invested,
+                        "average_nav": average_nav,
+                        "current_value": current_value,
+                        "xirr": xirr,
+                        "portfolio_source": portfolio_source,
+                        "folio_type": folio_type,
+                        "first_unrealised_purchase_date": first_unrealised_purchase_date,
+                        "sip_details": sip_details,
+                        "user": self._user,
+                    },
                 )
-
-                fund_investment_folio.save()
                 fund_investment.folios.add(fund_investment_folio)
         else:
             folio_number = investment.get("folioNumber")
@@ -226,38 +298,106 @@ class GrowwInvestment:
         fund_investment.units = units
         fund_investment.save()
 
-    @staticmethod
-    def create_or_update_fund(fund_details, partial_update=False):
-        fund = Fund.objects.filter(isin=fund_details["isin"]).last()
-        if fund is None:
-            fund = Fund.create_from_dict(fund_details)
-
-        holdings = fund_details.get("holdings")
-        create_fund_securities(fund=fund, securities=holdings)
-
-        return fund
-
     def process_fund_transactions(self, fund_investment):
         fund_investment_folios = fund_investment.folios.all()
         for fund_investment_folio in fund_investment_folios:
-            transactions = self._groww_request.get_scheme_transactions(
-                folio_number=fund_investment_folio.folio_number,
-                scheme_code=fund_investment.fund.scheme_code,
+            page = 0
+            while page != -1:
+                scheme_transactions = self._groww_request.get_scheme_transactions(
+                    folio_number=fund_investment_folio.folio_number,
+                    scheme_code=fund_investment.fund.scheme_code,
+                    page=page,
+                )
+                total_pages = int(scheme_transactions.get("total_pages"))
+                if page < total_pages:
+                    page += 1
+                else:
+                    page = -1
+
+                transactions = scheme_transactions.get("transaction_list")
+
+                fund_transactions = fund_investment.transactions.all()
+                for transaction in transactions:
+                    db_transaction = fund_transactions.filter(
+                        user_id=self._user.id,
+                        transaction_id=transaction.get("transaction_id"),
+                        user_account_id=transaction.get("user_account_id"),
+                    ).last()
+                    if db_transaction is None:
+                        transaction["user_id"] = self._user.id
+                        db_transaction = FundTransaction.create_from_dict(transaction)
+                        db_transaction.user = self._user
+                        fund_investment.transactions.add(db_transaction)
+                        db_transaction.save()
+                fund_investment.save()
+
+    def process_stock_investment(self, holding):
+        symbol_data = holding.get("symbolData")
+        holding_data = holding.get("holding")
+
+        isin = symbol_data.get("symbolIsin")
+
+        security = Security.objects.get(isin=isin)
+
+        user_investment, created = Investment.objects.get_or_create(
+            broker=BrokerTypeENUM.groww.name,
+            security=security,
+            defaults={
+                "quantity": holding_data.get("holdingQty"),
+                "avg_price": holding_data.get("holdingAvgPrice") / 100,
+                "security": security,
+            },
+        )
+
+        last_transaction = (
+            StockTransactions.objects.filter(investment_id=user_investment.id)
+            .order_by("-trade_date")
+            .first()
+        )
+
+        last_transaction_date = (
+            (last_transaction.trade_date - datetime.timedelta(days=1))
+            if last_transaction
+            else None
+        )
+
+        investment_transactions = self._groww_request.get_stock_investment_transactions(
+            isin=isin, till_date=last_transaction_date
+        )
+
+        self.create_or_update_stock_transaction(
+            transactions=investment_transactions, investment=user_investment
+        )
+
+    def create_or_update_stock_transaction(self, transactions, investment):
+        for transaction in transactions:
+            lookup_fields = {
+                "investment": investment,
+                "transaction_id": BrokerTypeENUM.groww.name
+                + str(investment.id)
+                + f"_{transaction.get('txnId')}",
+            }
+
+            update_fields = {
+                "quantity": transaction["qty"],
+                "price": int(transaction["price"]) / 100,
+                "trade_date": datetime.datetime.strptime(
+                    transaction.get("tradeDate"), "%Y-%m-%d"
+                ).date(),
+                "type": transaction["type"],
+                "data": transaction,
+            }
+            StockTransactions.objects.update_or_create(
+                defaults=update_fields, **lookup_fields
             )
-            fund_transactions = fund_investment.transactions.all()
-            for transaction in transactions:
-                db_transaction = fund_transactions.filter(
-                    user_id=self._user.id,
-                    transaction_id=transaction.get("transaction_id"),
-                    user_account_id=transaction.get("user_account_id"),
-                ).last()
-                if db_transaction is None:
-                    transaction["user_id"] = self._user.id
-                    db_transaction = FundTransaction.create_from_dict(transaction)
-                    db_transaction.user = self._user
-                    fund_investment.transactions.add(db_transaction)
-                    db_transaction.save()
-            fund_investment.save()
+
+        return
+
+    def import_stock_investment(self):
+        all_investments = self._groww_request.get_stock_investment()
+        investments = all_investments.get("holdings")
+        for investment in investments:
+            self.process_stock_investment(holding=investment)
 
 
 @extend_schema(tags=["GrowwRequest"])
@@ -298,7 +438,7 @@ class GrowwRequestViewSet(viewsets.ViewSet):
         detail=False,
     )
     def get_scheme_details(self, request, *args, **kwargs):
-        user = User.objects.last()
+        user = User.objects.first()
         groww = GrowwRequest(user, "get")
         request_data = SchemeSearchSerializer(data=request.query_params)
         if not request_data.is_valid():
@@ -338,7 +478,7 @@ class GrowwRequestViewSet(viewsets.ViewSet):
         detail=False,
     )
     def add_groww_investment(self, *args, **kwargs):
-        user = User.objects.last()
+        user = User.objects.first()
         groww = GrowwRequest(user, "post")
         mf_investment = groww.get_mf_investment()
 

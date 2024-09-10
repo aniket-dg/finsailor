@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datahub', '0034_security_event'),
+        ("datahub", "0034_security_event"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='security',
-            name='event',
+            model_name="security",
+            name="event",
         ),
     ]
