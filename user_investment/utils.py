@@ -3,6 +3,7 @@ import json
 import logging
 from _decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
+from typing import Dict
 from zoneinfo import ZoneInfo
 
 import json5
@@ -449,7 +450,9 @@ def calculate_todays_performance_by_macro_sector():
     # return res
 
 
-def get_last_updated_historical_data(security, last_date):
+def get_last_updated_historical_data(
+    security: Security, last_date: datetime.date
+) -> Dict:
     data_present = 0
     historical_data = None
     while not data_present:
@@ -458,4 +461,5 @@ def get_last_updated_historical_data(security, last_date):
             break
         last_date -= timedelta(days=1)
 
+    historical_data["date"] = last_date
     return historical_data

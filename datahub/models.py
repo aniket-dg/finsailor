@@ -1,3 +1,4 @@
+from enum import Enum
 from json import JSONEncoder
 
 from django.db import models
@@ -266,7 +267,26 @@ class TodaysMacroSectorPerformance(models.Model):
         return f"TodaysMacroSectorPerformance - {self.datetime}"
 
 
+class CorporateActionTypeEnum(Enum):
+    dividend = "Dividend"
+    agm = "Annual General Meeting"
+    buyback = "BuyBack"
+
+
 class CorporateAction(models.Model):
+    CORPORATE_ACTION_TYPE = (
+        (field.name, field.value) for field in CorporateActionTypeEnum
+    )
+    corporate_action_type = models.CharField(
+        max_length=100, null=True, blank=True, choices=CORPORATE_ACTION_TYPE
+    )
+    security = models.ForeignKey(
+        Security,
+        on_delete=models.SET_NULL,
+        related_name="corporate_actions",
+        null=True,
+        blank=True,
+    )
     symbol = models.CharField(max_length=20)
     series = models.CharField(max_length=10)
     ind = models.CharField(max_length=10, blank=True, null=True)
@@ -281,6 +301,10 @@ class CorporateAction(models.Model):
     isin = models.CharField(max_length=12)
     nd_end_date = models.DateField(blank=True, null=True)
     ca_broadcast_date = models.DateField(blank=True, null=True)
+    dividend = models.FloatField(default=0.0)
+
+    class Meta:
+        unique_together = (("security_id", "ex_date", "subject"),)
 
     @classmethod
     def create_from_dict(cls, data):
@@ -290,7 +314,7 @@ class CorporateAction(models.Model):
             return None
 
         # Convert dictionary to model instance
-        return cls.objects.create(
+        return cls(
             symbol=data.get("symbol"),
             series=data.get("series"),
             ind=data.get("ind") if data.get("ind") != "-" else None,

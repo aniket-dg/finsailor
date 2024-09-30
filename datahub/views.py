@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import django_filters
@@ -23,6 +24,7 @@ from datahub.serializers import (
     GeneralInfoSerializer,
     StockIndexSerializer,
     SecurityNameSerializer,
+    SecurityHistoricalPriceFilterSerializer,
 )
 from user_investment.views import UserInvestment
 from django.utils.translation import gettext_lazy as _
@@ -72,6 +74,63 @@ class SecurityViewSet(viewsets.ModelViewSet):
         if not details:
             return SecurityNameSerializer
         return SecuritySerializer
+
+    @extend_schema(
+        parameters=[SecurityHistoricalPriceFilterSerializer],
+        request=SecurityHistoricalPriceFilterSerializer,
+        responses={"200": SecuritySerializer(many=True)},
+    )
+    @action(detail=True, methods=["GET"])
+    def historical_data(self, request, *args, **kwargs):
+        query_params = SecurityHistoricalPriceFilterSerializer(
+            data=request.query_params
+        )
+        query_params.is_valid(raise_exception=True)
+        security = self.get_object()
+        today = datetime.datetime.now().date()
+        from_date = query_params.validated_data["from_date"]
+        historical_data = []
+        historical_price_info = security.historical_price_info
+        investment = security.investments.first()
+
+        transactions = {}
+        if investment:
+            for transaction in investment.transactions.all():
+                transactions[transaction.trade_date.isoformat()] = {
+                    "quantity": transaction.quantity,
+                    "price": transaction.price,
+                    "type": transaction.type,
+                }
+
+        for i in range((today - from_date).days):
+            key = from_date.isoformat()
+            data = historical_price_info.get(key, {})
+            transaction = transactions.get(key, {})
+            from_date += datetime.timedelta(days=1)
+
+            stock_price = (
+                transaction.get("price") if transaction else data.get("lastPrice")
+            )
+            volume = (
+                transaction["quantity"]
+                if transaction and transaction["type"].lower() == "credit"
+                else -transaction["quantity"]
+                if transaction
+                else 0
+            )
+
+            if stock_price:
+                historical_data.append(
+                    {
+                        "date": key,
+                        "stock_price": stock_price,
+                        "volume": volume,
+                    }
+                )
+            else:
+                logger.warning((stock_price, key))
+
+        return Response(historical_data, status=status.HTTP_200_OK)
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

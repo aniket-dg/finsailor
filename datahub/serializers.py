@@ -1,9 +1,11 @@
+import datetime
 import logging
 from _decimal import Decimal, ROUND_HALF_UP
 
 from rest_framework import serializers
 
-from datahub.models import Security, GeneralInfo, StockIndex
+from core.serializers import InvestmentInfoSerializer
+from datahub.models import Security, GeneralInfo, StockIndex, CorporateAction
 from news.serializers import StockEventSerializerForSecurity
 
 
@@ -12,6 +14,12 @@ class SecuritySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Security
+        fields = "__all__"
+
+
+class SecurityCorporateActionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CorporateAction
         fields = "__all__"
 
 
@@ -67,6 +75,21 @@ class SecurityFilterSerializer(UpdateSecuritySerializer):
     symbol = serializers.CharField(required=False)
     name = serializers.CharField(required=False)
     id = serializers.CharField(required=False)
+
+
+class SecurityHistoricalPriceFilterSerializer(serializers.Serializer):
+    from_date = serializers.DateField(required=True)
+
+    def validate_from_date(self, value):
+        today = datetime.datetime.now().date()
+
+        # Check if from_date is greater than today
+        if value > today:
+            raise serializers.ValidationError(
+                "from_date must be less than or equal to today."
+            )
+
+        return value
 
 
 class HistoricalPricesForSecurity(serializers.Serializer):

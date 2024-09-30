@@ -1,18 +1,11 @@
-import logging
+from rest_framework import serializers
 from _decimal import Decimal, ROUND_HALF_UP
 
-from rest_framework import serializers
-
 from combo_investment.utils import is_market_close_today
-from datahub.serializers import SecurityListSerializer
 from user_investment.models import Investment
-from user_investment.utils import get_security_percentage_change
-
-logger = logging.Logger("UserInvestment Serializer")
 
 
-class InvestmentSerializer(serializers.ModelSerializer):
-    security = SecurityListSerializer(read_only=True)
+class InvestmentInfoSerializer(serializers.ModelSerializer):
     avg_price = serializers.SerializerMethodField()
     change = serializers.SerializerMethodField()
     returns = serializers.SerializerMethodField()
@@ -21,7 +14,6 @@ class InvestmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Investment
         fields = [
-            "security",
             "avg_price",
             "change",
             "quantity",
@@ -59,6 +51,8 @@ class InvestmentSerializer(serializers.ModelSerializer):
 
     def get_change(self, investment):
         market_close_today = is_market_close_today()
+        from user_investment.utils import get_security_percentage_change
+
         return get_security_percentage_change(
             investment, market_close_today=market_close_today
         )

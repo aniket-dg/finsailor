@@ -11,7 +11,7 @@ from combo_investment import settings
 from combo_investment.celery import BaseTaskWithRetry
 from data_import.models import TradeBook
 from datahub.models import Security, StockIndex, TodayStockIndex, Holiday
-from datahub.utils import get_all_securities
+from datahub.utils import get_all_securities, process_corporate_actions
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment
@@ -316,3 +316,11 @@ def calculate_security_prices_sector_performance():
         link=callback,
         link_error=callback,
     )
+
+
+@shared_task(base=BaseTaskWithRetry)
+def process_corporate_actions_task():
+    securities = get_all_securities()
+    nse = NSEScrapper()
+    for security in securities:
+        process_corporate_actions(nse=nse, security=security)

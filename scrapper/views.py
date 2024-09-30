@@ -237,6 +237,31 @@ class NSEScrapper:
 
         return data, status_code
 
+    def get_corporate_actions(self, symbol, from_date=None, to_date=None):
+        url = settings.NSE_CORPORATE_ACTIONS_API_URL
+        if from_date is None:
+            from_date = (
+                (datetime.datetime.now() - datetime.timedelta(days=7300))
+                .date()
+                .strftime("%d-%m-%Y")
+            )
+        if to_date is None:
+            to_date = (
+                (datetime.datetime.now() + datetime.timedelta(days=365))
+                .date()
+                .strftime("%d-%m-%Y")
+            )
+        params = {
+            "index": "equities",
+            "from_date": from_date,
+            "to_date": to_date,
+            "symbol": symbol,
+        }
+
+        data, status_code = self.load_url(url, params=params)
+
+        return data, status_code
+
     def get_holidays(self) -> Dict:
         url = settings.NSE_HOLIDAYS_LIST_API_URL
 

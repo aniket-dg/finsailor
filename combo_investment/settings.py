@@ -265,6 +265,9 @@ NSE_STOCK_INDEX_DETAIL_API_URL = (
     "https://www.nseindia.com/api/equity-stockIndices?index="
 )
 NSE_UPCOMING_EVENTS_API_URL = "https://www.nseindia.com/api/event-calendar?"
+NSE_CORPORATE_ACTIONS_API_URL = (
+    "https://www.nseindia.com/api/corporates-corporateActions"
+)
 NSE_HOLIDAYS_LIST_API_URL = "https://www.nseindia.com/api/holiday-master?type=trading"
 
 
