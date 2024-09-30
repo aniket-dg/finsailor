@@ -240,3 +240,45 @@ class TodaysMacroSectorPerformance(models.Model):
 
     def __str__(self):
         return f"TodaysMacroSectorPerformance - {self.datetime}"
+
+
+class CorporateAction(models.Model):
+    symbol = models.CharField(max_length=20)
+    series = models.CharField(max_length=10)
+    ind = models.CharField(max_length=10, blank=True, null=True)
+    face_val = models.DecimalField(max_digits=10, decimal_places=2)
+    subject = models.CharField(max_length=255)
+    ex_date = models.DateField()
+    rec_date = models.DateField(blank=True, null=True)
+    bc_start_date = models.DateField(blank=True, null=True)
+    bc_end_date = models.DateField(blank=True, null=True)
+    nd_start_date = models.DateField(blank=True, null=True)
+    comp = models.CharField(max_length=255)
+    isin = models.CharField(max_length=12)
+    nd_end_date = models.DateField(blank=True, null=True)
+    ca_broadcast_date = models.DateField(blank=True, null=True)
+
+    @classmethod
+    def create_from_dict(cls, data):
+        def parse_date(date_str):
+            if date_str and date_str != "-":
+                return datetime.datetime.strptime(date_str, "%d-%b-%Y").date()
+            return None
+
+        # Convert dictionary to model instance
+        return cls.objects.create(
+            symbol=data.get("symbol"),
+            series=data.get("series"),
+            ind=data.get("ind") if data.get("ind") != "-" else None,
+            face_val=data.get("faceVal"),
+            subject=data.get("subject"),
+            ex_date=parse_date(data.get("exDate")),
+            rec_date=parse_date(data.get("recDate")),
+            bc_start_date=parse_date(data.get("bcStartDate")),
+            bc_end_date=parse_date(data.get("bcEndDate")),
+            nd_start_date=parse_date(data.get("ndStartDate")),
+            comp=data.get("comp"),
+            isin=data.get("isin"),
+            nd_end_date=parse_date(data.get("ndEndDate")),
+            ca_broadcast_date=parse_date(data.get("caBroadcastDate")),
+        )

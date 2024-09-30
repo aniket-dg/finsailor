@@ -37,3 +37,4 @@ def get_industry_index(index_type_id: int, date: str, index_type = "macro_sector
         index_value_free_float_cap += free_float_weighted_price
 
     return index_value_market_cap, index_value_free_float_cap
+

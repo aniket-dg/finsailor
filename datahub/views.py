@@ -1,4 +1,7 @@
+import logging
+
 import django_filters
+from django.db.models import Q
 from django.shortcuts import render
 from django_filters import FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
@@ -7,8 +10,10 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from combo_investment.pagination import PageNumberPaginationForSecurity
 from datahub.models import Security, GeneralInfo, StockIndex
 from datahub.serializers import (
     SecuritySerializer,
@@ -16,20 +21,34 @@ from datahub.serializers import (
     SecurityFilterSerializer,
     HistoricalPricesForSecurity,
     GeneralInfoSerializer,
-    StockIndexSerializer,
+    StockIndexSerializer, SecurityNameSerializer,
 )
 from user_investment.views import UserInvestment
+from django.utils.translation import gettext_lazy as _
 
+
+logger = logging.getLogger("Datahub")
 
 class SecurityFilter(FilterSet):
     symbol = django_filters.CharFilter(field_name="symbol", lookup_expr="iexact")
+    name_or_symbol = django_filters.CharFilter(method="filter_name_or_symbol_with_min_length")
     name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
     id = django_filters.CharFilter(method="filter_by_ids")
     limit = django_filters.NumberFilter()
+    details = django_filters.BooleanFilter(method="filter_details")
+
+    def filter_details(self, queryset, name, value):
+        return queryset
 
     def filter_by_ids(self, queryset, name, value):
         ids = value.split(",")
         return queryset.filter(id__in=ids)
+
+    def filter_name_or_symbol_with_min_length(self, queryset, name, value):
+        logger.info(value, "value")
+        if len(value) < 3:
+            raise ValidationError(_("Name must be at least 3 characters long"))
+        return queryset.filter(Q(name__icontains=value)|Q(symbol__icontains=value))
 
     class Meta:
         model = Security
@@ -40,18 +59,27 @@ class SecurityFilter(FilterSet):
 class SecurityViewSet(viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_class = SecurityFilter
+    pagination_class = PageNumberPaginationForSecurity
 
     def get_serializer_class(self):
         # if self.action in ["update_security"]:
         #     return UpdateSecuritySerializer
-
+        details = self.request.query_params.get("details", False)
+        if not details:
+            return SecurityNameSerializer
         return SecuritySerializer
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return Security.objects.none()
 
-        return Security.objects.all()
+        qs = Security.objects.all()
+        details = self.request.query_params.get("details", False)
+
+        if not details:
+            return qs.only("id", "name")
+
+        return qs
 
     def perform_create(self, serializer):
         serializer.save()

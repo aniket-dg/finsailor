@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from corsheaders.defaults import default_headers
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -66,8 +68,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -232,8 +234,12 @@ TIME_ZONE = "Asia/Kolkata"
 # CORS
 CORS_ORIGIN_WHITELIST = [
     "http://127.0.0.1:3000",
+    "http://localhost:3000",
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_HEADERS = ['*']
 
 # Celery Configuration Options
 CELERY_WORKER_CONCURRENCY = os.getenv("CELERY_WORKER_CONCURRENCY")

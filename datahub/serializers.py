@@ -14,6 +14,15 @@ class SecuritySerializer(serializers.ModelSerializer):
         model = Security
         fields = "__all__"
 
+class SecurityNameSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    def get_name(self, security):
+        return f"{security.name} ({security.symbol})"
+    class Meta:
+        model = Security
+        fields = ["id", "name"]
+
 
 logger = logging.Logger("UserInvestment - Serializers")
 

@@ -401,7 +401,7 @@ def calculate_todays_performance_by_macro_sector():
 
     local_tz = ZoneInfo(TIME_ZONE)
     today_date = datetime.datetime.now().astimezone(local_tz).date()
-    yesterday_date = (today_date - timedelta(days=1))
+    yesterday_date = today_date - timedelta(days=1)
     for macro_sector in macro_sectors:
         macro_sector_securities = securities.filter(
             basic_industry__industry__sector__macro_sector_id=macro_sector.id
