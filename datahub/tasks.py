@@ -137,14 +137,14 @@ def update_trade_info_of_securities():
         try:
             date_object = datetime.datetime.strptime(date_str, "%d-%b-%Y %H:%M:%S")
         except ValueError as e:
-            date_object = datetime.datetime.now().astimezone(ZoneInfo(settings.TIME_ZONE))
+            date_object = datetime.datetime.now().astimezone(
+                ZoneInfo(settings.TIME_ZONE)
+            )
         trade_info = market_dept_order_book.get("tradeInfo")
         security.market_cap = trade_info.get("totalMarketCap")
         security.free_float_market_cap = trade_info.get("ffmc")
         security.trade_info = {date_object.date().isoformat(): data}
         security.save()
-
-
 
 
 @shared_task(
@@ -200,10 +200,14 @@ def update_historical_data_of_stock_indices(from_date, to_date):
     nse = NSEScrapper()
     local_tz = ZoneInfo(settings.TIME_ZONE)
     for stock_index in stock_indexes:
-        data, status_code = nse.get_historical_stock_indices_data(stock_index.index, from_date, to_date)
+        data, status_code = nse.get_historical_stock_indices_data(
+            stock_index.index, from_date, to_date
+        )
         for index_data in data.get("indexCloseOnlineRecords"):
             new_index = stock_index.get_empty_object()
-            datetime_object = datetime.datetime.fromisoformat(index_data.get("TIMESTAMP").replace("Z", "+00:00"))
+            datetime_object = datetime.datetime.fromisoformat(
+                index_data.get("TIMESTAMP").replace("Z", "+00:00")
+            )
             dt_local = datetime_object.astimezone(local_tz)
             new_index.open = index_data.get("EOD_OPEN_INDEX_VAL")
             new_index.high = index_data.get("EOD_HIGH_INDEX_VAL")
@@ -215,7 +219,6 @@ def update_historical_data_of_stock_indices(from_date, to_date):
                 new_index.save()
             except IntegrityError as e:
                 pass
-
 
 
 @shared_task(base=BaseTaskWithRetry)

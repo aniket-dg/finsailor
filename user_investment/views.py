@@ -83,7 +83,7 @@ class UserInvestment:
             "total_traded_value": "CH_TOT_TRADED_VAL",
             "52_week_high_price": "CH_52WEEK_HIGH_PRICE",
             "52_week_low_price": "CH_52WEEK_LOW_PRICE",
-            "isin": "CH_ISIN"
+            "isin": "CH_ISIN",
         }
 
     def process_trade_books(self):

@@ -182,10 +182,7 @@ class NSEScrapper:
 
     def get_trade_info_by_symbol(self, symbol):
         url = settings.NSE_SYMBOL_QUOTE_API_URL
-        params = {
-            "symbol": symbol,
-            "section": "trade_info"
-        }
+        params = {"symbol": symbol, "section": "trade_info"}
         print(f"Fetching Trade Info for security - {symbol}")
 
         response, status_code = self.load_url(url, params=params)
@@ -225,7 +222,6 @@ class NSEScrapper:
 
         data, status_code = self.load_url(url, params=params)
         return data.get("data"), status_code
-
 
     def get_index_stocks(self, index_symbol):
         url = settings.NSE_STOCK_INDEX_DETAIL_API_URL + index_symbol

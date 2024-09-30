@@ -13,7 +13,7 @@ beat_schedules = {
         "schedule": crontab(minute="0", hour="17"),  # every day at 5 PM
         "options": {"queue": settings.SCHEDULED_TASK_QUEUE},
     },
-    "update_stock_indices_from_nse_at_4PM":{
+    "update_stock_indices_from_nse_at_4PM": {
         "task": "datahub.tasks.update_stock_indices_from_nse",
         "schedule": crontab(minute="0", hour="16"),  # every day at 4 PM
         "options": {"queue": settings.SCHEDULED_TASK_QUEUE},

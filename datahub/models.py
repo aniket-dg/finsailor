@@ -10,6 +10,7 @@ import decimal
 from industries.models import BasicIndustry
 from django.db.models import Func, Value, CharField
 
+
 class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime.date, datetime.datetime)):
@@ -19,7 +20,7 @@ class CustomJSONEncoder(JSONEncoder):
 
 
 class JSONExtractPathText(Func):
-    function = 'jsonb_extract_path_text'
+    function = "jsonb_extract_path_text"
     template = "%(function)s(%(expressions)s)"
 
     def __init__(self, expression, *paths, **extra):
@@ -38,8 +39,10 @@ class SecurityQuerySet(QuerySet):
 
     def with_close_price(self, date):
         return self.annotate(
-            last_price=JSONExtractPathText(F('historical_price_info'), Value(date), Value('lastPrice'))
-        ).values('symbol', 'last_price','market_cap', 'free_float_market_cap')
+            last_price=JSONExtractPathText(
+                F("historical_price_info"), Value(date), Value("lastPrice")
+            )
+        ).values("symbol", "last_price", "market_cap", "free_float_market_cap")
 
 
 class SecurityManager(models.Manager):
@@ -157,15 +160,36 @@ class StockIndex(models.Model):
 
     def get_empty_object(self):
         new_stock_index = self
-        fields_to_update_none = ["pk", "variation", "percentChange", "previousClose", "yearHigh", "yearLow",
-                                 "indicativeClose", "pe", "pb", "dy", "declines", "unchanged", "perChange356d",
-                                 "day365dAgo", "chart365dPath", "date30dAgo", "perChange30d", "chart30dPath",
-                                 "chartTodayPath", "previousDay", "oneWeekAgo", "oneMonthAgo", "oneYearAgo",
-                                 ]
+        fields_to_update_none = [
+            "pk",
+            "variation",
+            "percentChange",
+            "previousClose",
+            "yearHigh",
+            "yearLow",
+            "indicativeClose",
+            "pe",
+            "pb",
+            "dy",
+            "declines",
+            "unchanged",
+            "perChange356d",
+            "day365dAgo",
+            "chart365dPath",
+            "date30dAgo",
+            "perChange30d",
+            "chart30dPath",
+            "chartTodayPath",
+            "previousDay",
+            "oneWeekAgo",
+            "oneMonthAgo",
+            "oneYearAgo",
+        ]
         for field in fields_to_update_none:
             setattr(new_stock_index, field, None)
 
         return new_stock_index
+
     @classmethod
     def update_or_create_from_dict(cls, data):
         obj, created = cls.objects.update_or_create(

@@ -21,7 +21,8 @@ from datahub.serializers import (
     SecurityFilterSerializer,
     HistoricalPricesForSecurity,
     GeneralInfoSerializer,
-    StockIndexSerializer, SecurityNameSerializer,
+    StockIndexSerializer,
+    SecurityNameSerializer,
 )
 from user_investment.views import UserInvestment
 from django.utils.translation import gettext_lazy as _
@@ -29,9 +30,12 @@ from django.utils.translation import gettext_lazy as _
 
 logger = logging.getLogger("Datahub")
 
+
 class SecurityFilter(FilterSet):
     symbol = django_filters.CharFilter(field_name="symbol", lookup_expr="iexact")
-    name_or_symbol = django_filters.CharFilter(method="filter_name_or_symbol_with_min_length")
+    name_or_symbol = django_filters.CharFilter(
+        method="filter_name_or_symbol_with_min_length"
+    )
     name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
     id = django_filters.CharFilter(method="filter_by_ids")
     limit = django_filters.NumberFilter()
@@ -48,7 +52,7 @@ class SecurityFilter(FilterSet):
         logger.info(value, "value")
         if len(value) < 3:
             raise ValidationError(_("Name must be at least 3 characters long"))
-        return queryset.filter(Q(name__icontains=value)|Q(symbol__icontains=value))
+        return queryset.filter(Q(name__icontains=value) | Q(symbol__icontains=value))
 
     class Meta:
         model = Security
