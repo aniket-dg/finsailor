@@ -1,11 +1,13 @@
 import json
 from _decimal import Decimal, ROUND_HALF_UP
+from collections import defaultdict
 from enum import Enum
 
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models import QuerySet, Manager
+from django.db.models import QuerySet, Manager, ExpressionWrapper, F, DecimalField, Sum, Avg
+from django.db.models.functions import TruncMonth
 
 from data_import.models import TradeBook
 from datahub.models import Security, CustomJSONEncoder
@@ -93,3 +95,86 @@ class StockTransactions(models.Model):
     trade_date = models.DateField()
     data = models.JSONField(default=dict, encoder=CustomJSONEncoder)
     transaction_id = models.CharField(unique=True)
+
+    @staticmethod
+    def get_amount_invested(qs):
+        return float(
+                qs.annotate(
+                    total_value = ExpressionWrapper(
+                        F("price")*F("quantity"),
+                        output_field=DecimalField(decimal_places=2, max_digits=12)
+                    )
+                ).aggregate(total_investment_value=Sum("total_value"))[
+                    "total_investment_value"
+                ]
+                or 0
+        )
+
+    @staticmethod
+    def get_amount_invested_per_month(qs):
+        return (
+            qs.annotate(
+                total_value=ExpressionWrapper(
+                    F("price") * F("quantity"),
+                    output_field=DecimalField(decimal_places=2, max_digits=12)
+                ),
+                month=TruncMonth("trade_date")
+            )
+            .values("month")
+            .annotate(total_investment_value=Sum("total_value"))
+            .order_by("month")
+        )
+
+    @staticmethod
+    def get_amount_invested_with_returns(qs, month_date):
+        market_value = 0
+        for transaction in qs:
+            market_value += transaction.investment.security.get_last_price_for_month(month_date) * transaction.quantity
+
+        return StockTransactions.get_amount_invested(qs), market_value
+
+
+    @staticmethod
+    def get_amount_invested_per_month_per_investment_security(qs):
+        """
+        Get the total amount invested per month for each investment associated with a security.
+
+        :param qs: A queryset of StockTransactions
+        :return: A queryset with total investment per month per investment
+        """
+
+        security_ids = qs.values_list("investment__security_id", flat=True).distinct("investment__security_id")
+        securities = Security.objects.filter(id__in=security_ids)
+
+        securities_by_ids = {security.id: security for security in securities}
+
+        amount_invested_per_month_per_security = (
+            qs.annotate(
+                total_value=ExpressionWrapper(
+                    F("price") * F("quantity"),
+                    output_field=DecimalField(decimal_places=2, max_digits=12)
+                ),
+                month=TruncMonth("trade_date")
+            )
+            .values("investment__security_id", "month")
+            .annotate(
+                total_investment_value=Sum("total_value"),
+                total_quantity=Sum("quantity"),  # Include the total quantity here
+                avg_price=Avg("price")
+            )
+            .order_by("investment__security_id", "month")
+        )
+
+        res = defaultdict(lambda: defaultdict(int))
+
+        for amount_invested_per_month in amount_invested_per_month_per_security:
+            security = securities_by_ids.get(amount_invested_per_month["investment__security_id"])
+            security_last_price = security.get_last_price_for_month(amount_invested_per_month["month"])
+            quantity = amount_invested_per_month["total_quantity"]
+
+            res[amount_invested_per_month["month"].strftime("%b-%Y")]["market_value"] += quantity * security_last_price
+            res[amount_invested_per_month["month"].strftime("%b-%Y")]["invested_value"] += float(amount_invested_per_month["total_investment_value"])
+
+        return res
+
+

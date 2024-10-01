@@ -4,6 +4,8 @@ from _decimal import Decimal, ROUND_DOWN, ROUND_UP, ROUND_HALF_UP
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 
+from dateutil.relativedelta import relativedelta
+from drf_yasg import openapi
 import django_filters
 import logging
 from django.db.models import Q
@@ -26,7 +28,7 @@ from datahub.serializers import SecuritySerializerForSectorWisePortfolio
 from industries.models import MacroSector, Sector, Industry, BasicIndustry
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
-from user_investment.models import Investment, SectorWisePortfolio
+from user_investment.models import Investment, SectorWisePortfolio, StockTransactions
 from user_investment.serializer import InvestmentSerializer
 from user_investment.utils import (
     get_securities_by_sector,
@@ -259,10 +261,6 @@ class UserInvestment:
         return historical_db_price_info
 
     def performance(self, broker="all"):
-        market_close_today = is_market_close_today()
-        market_close_value_time = Parameter.objects.filter(
-            name="CLOSE_PRICE_TIME"
-        ).last()
         if broker.lower() == "all":
             user_investments = Investment.objects.filter(quantity__gt=0)
         else:
@@ -282,9 +280,7 @@ class UserInvestment:
                 continue
             security_processed.add(investment.security_id)
             res = get_security_percentage_change(
-                investment,
-                market_close_today,
-                market_close_value_time=market_close_value_time,
+                investment
             )
             serialized_security = SecuritySerializerForSectorWisePortfolio(
                 investment.security
@@ -390,28 +386,12 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         url_name="info",
     )
     def info(self, *args, **kwargs):
-        user = User.objects.first()
-        broker = self.request.query_params.get("broker", "all")
-        user_investment = UserInvestment()
         qs = self.get_queryset()
-        day_change = {}
-        one_day_changes = []
-        total_investment_value = 0
-        total_current_value = 0
-        market_close_today = is_market_close_today()
-        market_close_value_time = Parameter.objects.filter(
-            name="CLOSE_PRICE_TIME"
-        ).last()
-        for investment in qs:
-            security = investment.security
-            security_data = get_security_percentage_change(
-                investment,
-                market_close_today=market_close_today,
-                market_close_value_time=market_close_value_time,
-            )
-            day_change[security.symbol] = security_data
+        today = datetime.datetime.now()
+        last_month_day = today - relativedelta(months=1)
 
-            one_day_changes.append(security_data.get("total_change"))
+        current_month_transactions = StockTransactions.objects.filter(trade_date__month=today.month)
+        last_month_transactions = StockTransactions.objects.filter(trade_date__month=last_month_day.month)
 
         total_investment_value = (
             qs.annotate(
@@ -424,8 +404,21 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             ]
             or 0
         )
+        current_month_investment_value = (
+            current_month_transactions.annotate(
+                total_value = ExpressionWrapper(
+                    F("price")*F("quantity"),
+                    output_field=DecimalField(decimal_places=2, max_digits=12)
+                )
+            ).aggregate(total_investment_value=Sum("total_value"))[
+                "total_investment_value"
+            ]
+            or 0
+        )
+        invested_value_till_last_month = total_investment_value - current_month_investment_value
 
-        current_value = (
+        # Calculate Total Profit
+        current_market_value = (
             qs.annotate(
                 total_value=ExpressionWrapper(
                     F("security__last_updated_price") * F("quantity"),
@@ -436,9 +429,21 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             ]
             or 0
         )
+        total_returns = current_market_value - total_investment_value
         percentage_returns = Decimal(
-            (current_value / total_investment_value) * 100
+            ((current_market_value - total_investment_value) / total_investment_value) * 100
         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Calculate 1D change
+        day_change = {}
+        one_day_changes = []
+        for investment in qs:
+            security = investment.security
+            security_data = get_security_percentage_change(
+                investment
+            )
+            day_change[security.symbol] = security_data
+            one_day_changes.append(security_data.get("total_change"))
 
         one_day_change = Decimal(sum(one_day_changes)).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
@@ -447,34 +452,41 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             (one_day_change / total_investment_value) * 100
         ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-        amount_invested = Decimal(total_investment_value).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-        total_returns = current_value - amount_invested
-        total_returns = total_returns.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        current_value = Decimal(current_value).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-
-        sector_wise_portfolio = (
-            SectorWisePortfolio.objects.filter(user_id=user.id, broker=broker.lower())
-            .order_by("datetime")
-            .last()
-        )
-
-        data = {
-            "amount_invested": format(amount_invested, ","),
-            "total_returns": f"{total_returns}",
-            "total_preturns": percentage_returns,
-            "one_day_change": f"{one_day_change}",
-            "one_day_pchange": one_day_percentage_returns,
-            "current_value": format(current_value, ","),
-            "day_change": day_change,
-            "sector_wise_portfolio": sector_wise_portfolio.data,
-            "performance": user_investment.performance(broker=broker),
+        current_value_data = {
+            "amount": current_market_value,
+            "change": None
+        }
+        amount_invested_data = {
+            "amount": total_investment_value,
+            "change": ((total_investment_value - invested_value_till_last_month) / invested_value_till_last_month) * 100
+        }
+        profit_data = {
+            "amount": total_returns,
+            "change": percentage_returns
+        }
+        one_day_return_data = {
+            "amount": one_day_change,
+            "change": one_day_percentage_returns
         }
 
+        data = {
+            "amount_invested": amount_invested_data,
+            "profit": profit_data,
+            "one_day_change": one_day_return_data,
+            "current_value": current_value_data
+        }
         return Response(data=data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["GET"],
+        name="Investment Info",
+    )
+    def gainers_losers(self, *args, **kwargs):
+        user_investment = UserInvestment()
+        broker = self.request.query_params.get("broker", "all")
+        performance = user_investment.performance(broker=broker)
+        return Response(data=performance, status=status.HTTP_200_OK)
 
     @action(
         detail=False,
@@ -485,8 +497,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
     )
     def get_sector_allocation(self, *args, **kwargs):
         user = User.objects.first()
-        broker = self.request.query_params.get("broker", None)
-        qs = self.get_queryset()
+        broker = self.request.query_params.get("broker", "all")
 
         sector_wise_portfolio = (
             SectorWisePortfolio.objects.filter(user_id=user.id, broker=broker.lower())
@@ -495,101 +506,6 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         )
 
         return Response(data=sector_wise_portfolio.data, status=status.HTTP_200_OK)
-
-    @action(
-        detail=False,
-        methods=["GET"],
-        name="Macro Sector Allocation",
-        url_path="macro_sector_allocation",
-        url_name="macro_sector_allocation",
-    )
-    def get_macro_sector_allocation(self, *args, **kwargs):
-        broker = self.request.query_params.get("broker", None)
-        qs = self.get_queryset()
-        macro_sectors = MacroSector.objects.all()
-        sectors_investments = qs.filter(
-            security__basic_industry__industry__sector__macro_sector_id__in=macro_sectors.values_list(
-                "id", flat=True
-            )
-        )
-        macro_sectors_total_securities = sectors_investments.aggregate(
-            total_quantity=Sum("quantity")
-        )["total_quantity"]
-        data = get_macro_sector_allocation(
-            macro_sectors_total_securities, macro_sectors, sectors_investments
-        )
-        return Response(data=data, status=status.HTTP_200_OK)
-
-    @action(
-        detail=False,
-        methods=["GET"],
-        name="Sector Allocation",
-        url_path="ssector_allocation",
-        url_name="ssector_allocation",
-    )
-    def get_ssector_allocation(self, *args, **kwargs):
-        qs = self.get_queryset()
-        sectors = Sector.objects.all()
-        sectors_investments = qs.filter(
-            security__basic_industry__industry__sector_id__in=sectors.values_list(
-                "id", flat=True
-            )
-        )
-        sectors_total_securities = sectors_investments.aggregate(
-            total_quantity=Sum("quantity")
-        )["total_quantity"]
-        data = get_sector_allocation(
-            sectors_total_securities, sectors, sectors_investments
-        )
-        return Response(data=data, status=status.HTTP_200_OK)
-
-    @action(
-        detail=False,
-        methods=["GET"],
-        name="Industry Allocation",
-        url_path="industry_allocation",
-        url_name="industry_allocation",
-    )
-    def get_industry_allocation(self, *args, **kwargs):
-        qs = self.get_queryset()
-        industries = Industry.objects.all()
-        industries_investments = qs.filter(
-            security__basic_industry__industry_id__in=industries.values_list(
-                "id", flat=True
-            )
-        )
-        industry_total_securities = industries_investments.aggregate(
-            total_quantity=Sum("quantity")
-        )["total_quantity"]
-        data = get_industry_allocation(
-            industry_total_securities, industries, industries_investments
-        )
-        return Response(data=data, status=status.HTTP_200_OK)
-
-    @action(
-        detail=False,
-        methods=["GET"],
-        name="Basic Industry Allocation",
-        url_path="basic_industry_allocation",
-        url_name="basic_industry_allocation",
-    )
-    def get_basic_industry_allocation(self, *args, **kwargs):
-        qs = self.get_queryset()
-        basic_industries = BasicIndustry.objects.all()
-        basic_industries_investments = qs.filter(
-            security__basic_industry__industry_id__in=basic_industries.values_list(
-                "id", flat=True
-            )
-        )
-        basic_industry_total_securities = basic_industries_investments.aggregate(
-            total_quantity=Sum("quantity")
-        )["total_quantity"]
-        data = get_basic_industry_allocation(
-            basic_industry_total_securities,
-            basic_industries,
-            basic_industries_investments,
-        )
-        return Response(data=data, status=status.HTTP_200_OK)
 
 
 class TransactionFilter(FilterSet):

@@ -356,34 +356,20 @@ def get_security_allocation(total_securities, investments):
 
 
 def get_security_percentage_change(
-    investment, market_close_today, market_close_value_time=None
+    investment
 ):
     security = investment.security
-    if market_close_value_time is None:
-        market_close_value_time = Parameter.objects.filter(
-            name="CLOSE_PRICE_TIME"
-        ).last()
+    today = datetime.datetime.now()
 
-    local_tz = ZoneInfo(settings.TIME_ZONE)
-    today = datetime.datetime.now().astimezone(local_tz)
-    today_data = security.historical_price_info.get(today.date().isoformat())
-
-    if market_close_today:
-        last_date = sorted(security.historical_price_info.keys())[-1]
-        today_data = security.historical_price_info.get(last_date)
-
-    last_price = Decimal(today_data.get("lastPrice"))
-    if today.time() < market_close_value_time.time:
-        last_price = Decimal(today_data.get("close"))
-
-    last_close = Decimal(today_data.get("previousClose"))
-
+    last_updated_data = get_last_updated_historical_data(security, today.date())
+    last_price = Decimal(security.last_updated_price)
+    last_close = Decimal(last_updated_data.get("previousClose"))
     change = ((last_price - last_close) / last_close) * 100
-    total_change = today_data.get("change") * investment.quantity
+    total_change = last_updated_data.get("change") * investment.quantity
 
     res = {
         "p_change": change.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
-        "change": Decimal(today_data.get("change")).quantize(
+        "change": Decimal(last_updated_data.get("change")).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         ),
         "total_change": Decimal(total_change).quantize(
@@ -453,6 +439,9 @@ def calculate_todays_performance_by_macro_sector():
 def get_last_updated_historical_data(
     security: Security, last_date: datetime.date
 ) -> Dict:
+    if type(last_date) != datetime.date:
+        raise Exception(f"last_date must be datetime.date not {type(last_date)}")
+
     data_present = 0
     historical_data = None
     while not data_present:

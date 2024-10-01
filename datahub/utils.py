@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime, timedelta
 
 from django.db import IntegrityError
 from django.db.models import Sum, F
@@ -94,3 +95,17 @@ def process_corporate_actions(nse: NSEScrapper, security):
             logger.info(
                 f"Corporate action is already exists for {security} for date {corporate_action.ex_date}"
             )
+
+
+
+def get_first_and_last_day(year, month):
+    # Get the first day of the month
+    first_day = datetime(year, month, 1)
+
+    # Calculate the last day of the month
+    if month == 12:  # December
+        last_day = datetime(year + 1, 1, 1) - timedelta(days=1)
+    else:  # Any other month
+        last_day = datetime(year, month + 1, 1) - timedelta(days=1)
+
+    return first_day.date(), last_day.date()

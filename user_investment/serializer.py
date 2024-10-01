@@ -58,7 +58,6 @@ class InvestmentSerializer(serializers.ModelSerializer):
         )
 
     def get_change(self, investment):
-        market_close_today = is_market_close_today()
         return get_security_percentage_change(
-            investment, market_close_today=market_close_today
+            investment
         )

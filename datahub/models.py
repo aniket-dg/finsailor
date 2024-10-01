@@ -1,6 +1,6 @@
 from enum import Enum
 from json import JSONEncoder
-
+from dateutil.relativedelta import relativedelta
 from django.db import models
 from django.db.models import QuerySet, F
 from django.utils.translation import gettext_lazy as _
@@ -10,6 +10,7 @@ import decimal
 
 from industries.models import BasicIndustry
 from django.db.models import Func, Value, CharField
+
 
 
 class CustomJSONEncoder(JSONEncoder):
@@ -95,6 +96,14 @@ class Security(models.Model):
 
     def __str__(self):
         return f"Security - {self.name}"
+
+    def get_last_price_for_month(self, last_day: datetime.date):
+        from user_investment.utils import get_last_updated_historical_data
+        last_day = last_day + relativedelta(months=1)
+        next_month_date = last_day.replace(day=1)
+        last_date = next_month_date - datetime.timedelta(days=1)
+        historical_price_info = get_last_updated_historical_data(self, last_date)
+        return historical_price_info["lastPrice"]
 
 
 class ExchangeType(models.TextChoices):
