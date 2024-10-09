@@ -284,7 +284,7 @@ class CorporateActionTypeEnum(Enum):
 
 class CorporateAction(models.Model):
     CORPORATE_ACTION_TYPE = (
-        (field.name, field.value) for field in CorporateActionTypeEnum
+        (field.value, field.name) for field in CorporateActionTypeEnum
     )
     corporate_action_type = models.CharField(
         max_length=100, null=True, blank=True, choices=CORPORATE_ACTION_TYPE
@@ -339,3 +339,8 @@ class CorporateAction(models.Model):
             nd_end_date=parse_date(data.get("ndEndDate")),
             ca_broadcast_date=parse_date(data.get("caBroadcastDate")),
         )
+
+
+class Watchlist(models.Model):
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="watchlist")
+    security = models.ManyToManyField(Security)

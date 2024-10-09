@@ -29,7 +29,7 @@ from industries.models import MacroSector, Sector, Industry, BasicIndustry
 from industries.views import get_basic_industry_object_from_industry_info
 from scrapper.views import NSEScrapper
 from user_investment.models import Investment, SectorWisePortfolio, StockTransactions
-from user_investment.serializer import InvestmentSerializer
+from user_investment.serializer import InvestmentSerializer, StockTransactionSerializer
 from user_investment.utils import (
     get_securities_by_sector,
     get_security_percentage_change,
@@ -387,11 +387,12 @@ class InvestmentViewSet(viewsets.ModelViewSet):
     )
     def info(self, *args, **kwargs):
         qs = self.get_queryset()
+        qs = self.filter_queryset(qs)
         today = datetime.datetime.now()
         last_month_day = today - relativedelta(months=1)
 
-        current_month_transactions = StockTransactions.objects.filter(trade_date__month=today.month)
-        last_month_transactions = StockTransactions.objects.filter(trade_date__month=last_month_day.month)
+        current_month_transactions = StockTransactions.objects.filter(trade_date__month=today.month, investment_id__in=qs.values_list("id", flat=True))
+        last_month_transactions = StockTransactions.objects.filter(trade_date__month=last_month_day.month, investment_id__in=qs.values_list("id", flat=True))
 
         total_investment_value = (
             qs.annotate(
@@ -458,7 +459,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         }
         amount_invested_data = {
             "amount": total_investment_value,
-            "change": ((total_investment_value - invested_value_till_last_month) / invested_value_till_last_month) * 100
+            "change": Decimal(((total_investment_value - invested_value_till_last_month) / invested_value_till_last_month) * 100).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if invested_value_till_last_month > 0 else 100
         }
         profit_data = {
             "amount": total_returns,
@@ -505,31 +506,23 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             .last()
         )
 
-        return Response(data=sector_wise_portfolio.data, status=status.HTTP_200_OK)
+        return Response(data=sector_wise_portfolio.flatten_data(), status=status.HTTP_200_OK)
 
 
 class TransactionFilter(FilterSet):
-    broker = django_filters.CharFilter(method="filter_by_broker")
-
-    # name = django_filters.CharFilter(field_name="name", lookup_expr="contains")
-    # id = django_filters.CharFilter(method="filter_by_ids")
-    #
-    def filter_by_broker(self, queryset, name, value):
-        if value.lower() == "all":
-            return queryset
-        return queryset.filter(broker=value)
-
     class Meta:
-        model = TradeBook
+        model = StockTransactions
         fields = (
-            "id",
-            "symbol",
-            "buy_sell",
-            "broker",
-            "processed",
-            "investment_processed",
-            "user",
-            "execution_datetime",
+            "type",
+            "trade_date",
+            # "id",
+            # "symbol",
+            # "buy_sell",
+            # "broker",
+            # "processed",
+            # "investment_processed",
+            # "user",
+            # "execution_datetime",
         )
 
 
@@ -539,17 +532,17 @@ class TransactionViewSet(viewsets.ModelViewSet):
     filterset_class = TransactionFilter
 
     def get_queryset(self):
-        qs = TradeBook.objects.all()
+        qs = StockTransactions.objects.all()
         filtered_qs = self.filter_queryset(qs)
-        last_trade_book = filtered_qs.order_by("execution_datetime").last()
-        trade_books = TradeBook.objects.none()
-        if last_trade_book is not None:
-            date = last_trade_book.execution_datetime.date()
-            trade_books = filtered_qs.filter(execution_datetime__date=date)
-        return trade_books
+        last_transaction = filtered_qs.order_by("trade_date").last()
+        transactions = StockTransactions.objects.none()
+        if last_transaction is not None:
+            date = last_transaction.trade_date
+            transactions = filtered_qs.filter(trade_date=date)
+        return transactions
 
     def get_serializer_class(self):
-        return TradeBookSerializer
+        return StockTransactionSerializer
 
 
 def demo(request):

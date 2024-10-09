@@ -9,7 +9,7 @@ from django.db import models
 from django.db.models import QuerySet, Manager, ExpressionWrapper, F, DecimalField, Sum, Avg
 from django.db.models.functions import TruncMonth
 
-from data_import.models import TradeBook
+from data_import.models import TradeBook, BrokerEnum
 from datahub.models import Security, CustomJSONEncoder
 from users.models import User
 
@@ -65,6 +65,27 @@ class SectorWisePortfolio(models.Model):
     datetime = models.DateTimeField(auto_now_add=True)
     data = models.JSONField(default=dict, encoder=CustomJSONEncoder)
 
+    def flatten(self, sector_data):
+        res = []
+        data = sector_data["data"]
+        for k, v in data.items():
+            res.append({
+                "name": k,
+                'allocation': v["metadata"]["allocation"],
+                'amount_invested': v["metadata"]["amount_invested"],
+                'no_of_stocks': v["metadata"]["no_of_stocks"]
+            })
+        return res
+
+    def flatten_data(self):
+        res = {}
+        data = self.data["data"]
+        for sector_name, sector_data in data.items():
+            res[sector_name] = self.flatten(sector_data)
+
+        return res
+
+
 
 class TransactionTypeENUM(Enum):
     credit = "Credit"
@@ -95,6 +116,10 @@ class StockTransactions(models.Model):
     trade_date = models.DateField()
     data = models.JSONField(default=dict, encoder=CustomJSONEncoder)
     transaction_id = models.CharField(unique=True)
+    BrokerTypes = ((field.name, field.value) for field in BrokerEnum)
+    broker = models.CharField(
+        max_length=100, choices=BrokerTypes, default="groww"
+    )
 
     @staticmethod
     def get_amount_invested(qs):

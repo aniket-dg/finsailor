@@ -6,25 +6,26 @@ from django.db.models import Q
 from django.shortcuts import render
 from django_filters import FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from combo_investment.pagination import PageNumberPaginationForSecurity
-from datahub.models import Security, GeneralInfo, StockIndex
+from datahub.models import Security, GeneralInfo, StockIndex, CorporateAction, CorporateActionTypeEnum
 from datahub.serializers import (
     SecuritySerializer,
     UpdateSecuritySerializer,
     SecurityFilterSerializer,
-    HistoricalPricesForSecurity,
+    HistoricalPricesForSecuritySerializer,
     GeneralInfoSerializer,
     StockIndexSerializer,
     SecurityNameSerializer,
-    SecurityHistoricalPriceFilterSerializer,
+    SecurityHistoricalPriceFilterSerializer, SecurityCorporateActionSerializer, CorporateActionFilterForSecurity,
 )
 from user_investment.views import UserInvestment
 from django.utils.translation import gettext_lazy as _
@@ -59,6 +60,17 @@ class SecurityFilter(FilterSet):
     class Meta:
         model = Security
         fields = ("id", "symbol", "name")
+
+
+class SecurityCorporateActionFilter(FilterSet):
+    ex_date__lte = django_filters.DateFilter(field_name="ex_date", lookup_expr="lte")
+    ex_date__gte = django_filters.DateFilter(field_name="ex_date", lookup_expr="gte")
+    dividend__gte = django_filters.NumberFilter(field_name="dividend", lookup_expr="gte")
+    dividend__lte = django_filters.NumberFilter(field_name="dividend", lookup_expr="lte")
+
+    class Meta:
+        model = CorporateAction
+        fields = ["id", "corporate_action_type", "ex_date", "dividend"]
 
 
 @extend_schema(tags=["Datahub App"])
@@ -194,7 +206,7 @@ class SecurityViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @extend_schema(parameters=[HistoricalPricesForSecurity])
+    @extend_schema(parameters=[HistoricalPricesForSecuritySerializer])
     @action(
         detail=True,
         methods=["GET"],
@@ -214,6 +226,63 @@ class SecurityViewSet(viewsets.ModelViewSet):
         return Response(serialized_security_data, status=status.HTTP_200_OK)
 
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                description="Filter by Corporate Action ID",
+                required=False,
+                type=OpenApiTypes.INT
+            ),
+            OpenApiParameter(
+                name="corporate_action_type",
+                description="Filter by Corporate Action Type",
+                required=False,
+                type=OpenApiTypes.STR,
+                enum=[field.value for field in CorporateActionTypeEnum]
+            ),
+            OpenApiParameter(
+                name="ex_date__gte",
+                description="Filter by Ex-Date greater than or equal to (YYYY-MM-DD)",
+                required=False,
+                type=OpenApiTypes.DATE
+            ),
+            OpenApiParameter(
+                name="ex_date__lte",
+                description="Filter by Ex-Date less than or equal to (YYYY-MM-DD)",
+                required=False,
+                type=OpenApiTypes.DATE
+            ),
+            OpenApiParameter(
+                name="dividend__gte",
+                description="Filter by Dividend greater than or equal to",
+                required=False,
+                type=OpenApiTypes.FLOAT
+            ),
+            OpenApiParameter(
+                name="dividend__lte",
+                description="Filter by Dividend less than or equal to",
+                required=False,
+                type=OpenApiTypes.FLOAT
+            ),
+            # Add more filters as needed
+        ]
+    )
+    @action(detail=True, methods=["GET"])
+    def corporate_actions(self, *args, **kwargs):
+        security = self.get_object()
+        queryset = security.corporate_actions.all()
+        # Apply the SecurityCorporateActionFilter
+        filter_set = SecurityCorporateActionFilter(self.request.GET, queryset=queryset)
+
+        if not filter_set.is_valid():
+            return Response(filter_set.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = filter_set.qs
+
+        return Response(SecurityCorporateActionSerializer(queryset, many=True).data)
+
+
 @extend_schema(tags=["General Info"])
 class GeneralInfoViewSet(viewsets.ModelViewSet):
     queryset = GeneralInfo.objects.all()
@@ -223,3 +292,23 @@ class GeneralInfoViewSet(viewsets.ModelViewSet):
 class StockIndexViewSet(viewsets.ModelViewSet):
     queryset = StockIndex.objects.all()
     serializer_class = StockIndexSerializer
+
+
+class CorporateActionFilter(SecurityCorporateActionFilter):
+    class Meta:
+        model = CorporateAction
+        fields = ["id", "corporate_action_type", "ex_date", "dividend", "security"]
+
+
+@extend_schema(tags=["Datahub App"])
+class CorporateActionViewSet(mixins.ListModelMixin,mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    serializer_class = SecurityCorporateActionSerializer
+    filterset_class = CorporateActionFilter
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return CorporateAction.objects.none()
+
+        qs = CorporateAction.objects.all()
+
+        return qs

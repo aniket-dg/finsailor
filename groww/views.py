@@ -339,7 +339,7 @@ class GrowwInvestment:
 
         security = Security.objects.get(isin=isin)
 
-        user_investment, created = Investment.objects.get_or_create(
+        user_investment, created = Investment.objects.update_or_create(
             broker=BrokerTypeENUM.groww.name,
             security=security,
             defaults={
@@ -348,6 +348,8 @@ class GrowwInvestment:
                 "security": security,
             },
         )
+
+        print(created, security, holding_data.get("holdingQty"))
 
         last_transaction = (
             StockTransactions.objects.filter(investment_id=user_investment.id)

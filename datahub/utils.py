@@ -78,7 +78,7 @@ def process_corporate_actions(nse: NSEScrapper, security):
             corporate_action.security = security
             if "dividend" in subject:
                 corporate_action.corporate_action_type = (
-                    CorporateActionTypeEnum.dividend
+                    CorporateActionTypeEnum.dividend.name
                 )
                 match = re.search(r"\d+\.\d+", subject)
                 if match:
@@ -86,9 +86,9 @@ def process_corporate_actions(nse: NSEScrapper, security):
                     corporate_action.dividend = extracted_value
                 print(subject, corporate_action.dividend)
             elif "annual general meeting" in subject:
-                corporate_action.corporate_action_type = CorporateActionTypeEnum.agm
+                corporate_action.corporate_action_type = CorporateActionTypeEnum.agm.name
             elif "buyback" in subject:
-                corporate_action.corporate_action_type = CorporateActionTypeEnum.buyback
+                corporate_action.corporate_action_type = CorporateActionTypeEnum.buyback.name
 
             corporate_action.save()
         except IntegrityError as e:

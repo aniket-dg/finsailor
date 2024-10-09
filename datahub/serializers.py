@@ -5,22 +5,29 @@ from _decimal import Decimal, ROUND_HALF_UP
 from rest_framework import serializers
 
 from core.serializers import InvestmentInfoSerializer
-from datahub.models import Security, GeneralInfo, StockIndex, CorporateAction
+from datahub.models import Security, GeneralInfo, StockIndex, CorporateAction, CorporateActionTypeEnum
 from news.serializers import StockEventSerializerForSecurity
 
-
-class SecuritySerializer(serializers.ModelSerializer):
-    events = StockEventSerializerForSecurity(many=True, read_only=True)
-
-    class Meta:
-        model = Security
-        fields = "__all__"
 
 
 class SecurityCorporateActionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CorporateAction
         fields = "__all__"
+
+
+class SecuritySerializer(serializers.ModelSerializer):
+    events = StockEventSerializerForSecurity(many=True, read_only=True)
+    corporate_actions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Security
+        # fields = "__all__"
+        exclude = ["historical_price_info"]
+
+    def get_corporate_actions(self, security):
+        corporate_actions = security.corporate_actions.order_by('-ex_date')
+        return SecurityCorporateActionSerializer(corporate_actions, many=True).data
 
 
 class SecurityNameSerializer(serializers.ModelSerializer):
@@ -92,8 +99,16 @@ class SecurityHistoricalPriceFilterSerializer(serializers.Serializer):
         return value
 
 
-class HistoricalPricesForSecurity(serializers.Serializer):
+class HistoricalPricesForSecuritySerializer(serializers.Serializer):
     from_year = serializers.IntegerField(required=False)
+
+
+
+class CorporateActionFilterForSecurity(serializers.Serializer):
+    CORPORATE_ACTION_TYPE = [(field.name, field.value) for field in CorporateActionTypeEnum]
+    corporate_action_type = serializers.ChoiceField(choices=CORPORATE_ACTION_TYPE, required=False)
+    ex_date = serializers.DateField(required=False)
+    ex_date__gte = serializers.DateField(required=False)
 
 
 class GeneralInfoSerializer(serializers.ModelSerializer):
